@@ -1,0 +1,85 @@
+- generic [active] [ref=e1]:
+  - complementary [ref=e2]:
+    - generic [ref=e4]:
+      - generic [ref=e8]: JP
+      - generic [ref=e9]: Picard OS
+    - navigation [ref=e10]:
+      - link "Dashboard" [ref=e11] [cursor=pointer]:
+        - /url: /
+        - img [ref=e12]
+        - text: Dashboard
+      - link "XODUS" [ref=e17] [cursor=pointer]:
+        - /url: /xodus
+        - img [ref=e18]
+        - text: XODUS
+      - link "Daily Log" [ref=e21] [cursor=pointer]:
+        - /url: /daily
+        - img [ref=e22]
+        - text: Daily Log
+      - link "Projects" [ref=e24] [cursor=pointer]:
+        - /url: /projects
+        - img [ref=e25]
+        - text: Projects
+      - link "Fitness" [ref=e27] [cursor=pointer]:
+        - /url: /fitness
+        - img [ref=e28]
+        - text: Fitness
+      - generic [ref=e30]: Tools
+      - link "Stack" [ref=e31] [cursor=pointer]:
+        - /url: /stack
+        - img [ref=e32]
+        - text: Stack
+      - link "Voice" [ref=e35] [cursor=pointer]:
+        - /url: /voice
+        - img [ref=e36]
+        - text: Voice
+      - link "Uploads" [ref=e39] [cursor=pointer]:
+        - /url: /uploads
+        - img [ref=e40]
+        - text: Uploads
+    - generic [ref=e43]:
+      - generic [ref=e44]:
+        - generic [ref=e45]: Recovery
+        - generic [ref=e46]: 74%
+      - paragraph [ref=e49]: HRV 52ms · RHR 52bpm
+  - main [ref=e51]:
+    - generic [ref=e52]:
+      - generic [ref=e54]:
+        - generic [ref=e57]: AI Command Center
+        - heading "XODUS" [level=1] [ref=e58]
+        - generic [ref=e59]:
+          - generic [ref=e60]: HIGH
+          - generic [ref=e62]: Exec Score
+          - generic [ref=e63]: 37/100
+          - generic [ref=e64]: ·
+          - generic [ref=e65]: Recovery
+          - generic [ref=e66]: ADAPTED
+      - generic [ref=e67]:
+        - generic [ref=e68]:
+          - generic [ref=e69]:
+            - generic [ref=e70]:
+              - generic [ref=e73]: Daily Brief · May 8, 2026
+              - generic [ref=e74]: · estimated
+            - generic [ref=e75]:
+              - paragraph [ref=e76]: Recovery at 74 — HRV 52ms, resting HR 52bpm. System is adapted. Body absorbed the load. Ready to push.
+              - paragraph [ref=e77]: Nutrition not logged. Target is 180g protein and 2,500 cal. Log it.
+              - paragraph [ref=e78]: 23 days no alcohol — compounding silently.
+              - paragraph [ref=e79]: Log your metrics. XODUS cannot coach from incomplete data. 60 seconds.
+            - generic [ref=e80]:
+              - paragraph [ref=e81]: Focus
+              - paragraph [ref=e82]: log today's metrics
+          - link "Log Today for Full Personalized Brief →" [ref=e84] [cursor=pointer]:
+            - /url: /daily
+        - generic [ref=e86]:
+          - paragraph [ref=e88]: Ask XODUS
+          - generic [ref=e89]:
+            - button "How is my recovery trending this week?" [ref=e90]
+            - button "What should I prioritize today?" [ref=e91]
+            - button "Summarize my last 3 workouts" [ref=e92]
+          - generic [ref=e93]:
+            - generic [ref=e94]:
+              - textbox "Ask XODUS anything…" [ref=e95]
+              - button "Send" [ref=e96]
+            - paragraph [ref=e97]: Set ANTHROPIC_API_KEY in .env.local to enable
+  - button "Open Next.js Dev Tools" [ref=e103] [cursor=pointer]:
+    - img [ref=e104]
