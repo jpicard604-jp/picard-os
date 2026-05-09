@@ -1,102 +1,79 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { JACKSON } from '@/lib/mock-data'
-import { getDailyActivitySummary } from '@/lib/activity-summary'
+import Link from 'next/link'
+import { getProjects, daysUntil } from '@/lib/projects'
+import type { Project } from '@/lib/projects'
 import { STORAGE_EVENTS } from '@/lib/storage'
 
-type RingProps = {
-  value: number
-  max: number
-  color: string
-  label: string
-  unit: string
-  size?: number
-  strokeWidth?: number
+const URGENCY_DOT: Record<string, string> = {
+  LOW:      'bg-green-400',
+  MODERATE: 'bg-blue-400',
+  HIGH:     'bg-amber-400',
+  CRITICAL: 'bg-red-400',
 }
 
-function Ring({ value, max, color, label, unit, size = 88, strokeWidth = 7 }: RingProps) {
-  const radius = (size - strokeWidth) / 2
-  const circumference = 2 * Math.PI * radius
-  const progress = Math.min(value / max, 1)
-  const offset = circumference * (1 - progress)
+function ProjectRow({ project }: { project: Project }) {
+  const pct  = project.progress
+  const days = project.targetDate ? daysUntil(project.targetDate) : null
+  const overdue = days !== null && days < 0
 
   return (
-    <div className="flex flex-col items-center gap-2">
-      <div className="relative" style={{ width: size, height: size }}>
-        <svg width={size} height={size} className="-rotate-90">
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            fill="none"
-            stroke="rgba(255,255,255,0.06)"
-            strokeWidth={strokeWidth}
-          />
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            fill="none"
-            stroke={color}
-            strokeWidth={strokeWidth}
-            strokeLinecap="round"
-            strokeDasharray={circumference}
-            strokeDashoffset={offset}
-            style={{ filter: `drop-shadow(0 0 6px ${color}80)` }}
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-base font-mono font-bold text-white leading-none">{value}</span>
-          <span className="text-[9px] text-zinc-600 mt-0.5">{unit}</span>
-        </div>
+    <div className="flex items-center gap-3 px-4 py-3.5 border-b border-white/[0.04] last:border-0">
+      <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${URGENCY_DOT[project.urgency] ?? 'bg-zinc-600'}`} />
+      <div className="flex-1 min-w-0">
+        <p className="text-[13px] text-zinc-200 truncate">{project.title}</p>
+        {days !== null && (
+          <p className={`text-[9px] font-mono mt-0.5 ${overdue ? 'text-red-400' : 'text-zinc-600'}`}>
+            {overdue ? `${Math.abs(days)}d overdue` : `${days}d left`}
+          </p>
+        )}
       </div>
-      <span className="text-[10px] font-medium text-zinc-500 tracking-wide">{label}</span>
+      <div className="flex items-center gap-2.5 flex-shrink-0">
+        <div className="w-14 h-0.5 bg-white/[0.08] rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all duration-500 ${
+              pct >= 80 ? 'bg-green-500' : pct >= 50 ? 'bg-blue-500' : 'bg-zinc-500'
+            }`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <span className="text-[9px] font-mono text-zinc-600 w-7 text-right">{pct}%</span>
+      </div>
     </div>
   )
 }
 
-export default function FitnessWidget() {
-  const { score, hrv, restingHR, sleepHours, sleepScore, strain } = JACKSON.today.recovery
-  const glowClass = score >= 70 ? 'glow-green' : score >= 50 ? 'glow-amber' : 'glow-red'
-  const [activeMin, setActiveMin] = useState(0)
+export default function ProjectSummary() {
+  const [projects, setProjects] = useState<Project[]>([])
+
+  function refresh() {
+    const all = getProjects()
+    setProjects(all.filter((p) => p.status === 'active').slice(0, 4))
+  }
 
   useEffect(() => {
-    const refresh = () => setActiveMin(getDailyActivitySummary().activeMinutesToday)
     refresh()
-    window.addEventListener(STORAGE_EVENTS.ACTIVITY_LOG_UPDATED, refresh)
-    window.addEventListener(STORAGE_EVENTS.DAILY_LOG_UPDATED, refresh)
-    return () => {
-      window.removeEventListener(STORAGE_EVENTS.ACTIVITY_LOG_UPDATED, refresh)
-      window.removeEventListener(STORAGE_EVENTS.DAILY_LOG_UPDATED, refresh)
-    }
+    window.addEventListener(STORAGE_EVENTS.PROJECTS_UPDATED, refresh)
+    return () => window.removeEventListener(STORAGE_EVENTS.PROJECTS_UPDATED, refresh)
   }, [])
 
   return (
-    <div className={`mx-4 mt-3 rounded-2xl bg-[#111] border border-white/10 p-5 card-elevated ${glowClass}`}>
-      <div className="flex items-center justify-between mb-5">
-        <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Recovery Rings</span>
-        <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-wide">{JACKSON.today.date}</span>
+    <div className="mx-4 mt-3">
+      <div className="flex items-center justify-between mb-2.5">
+        <span className="text-[9px] font-mono uppercase tracking-[0.12em] text-zinc-700">Projects</span>
+        <Link href="/projects" className="text-[9px] font-mono text-blue-400 hover:text-blue-300 transition-colors">
+          All →
+        </Link>
       </div>
-
-      <div className="flex justify-around">
-        <Ring value={score} max={100} color="#22c55e" label="Recovery" unit="%" />
-        <Ring value={sleepHours} max={9} color="#3b82f6" label="Sleep" unit="hr" />
-        <Ring value={strain} max={21} color="#f59e0b" label="Strain" unit="/21" />
-      </div>
-
-      <div className="grid grid-cols-4 gap-1 mt-5 pt-4 border-t border-white/[0.07]">
-        {[
-          { label: 'HRV', value: `${hrv}ms` },
-          { label: 'HR Rest', value: `${restingHR}` },
-          { label: 'Sleep Q', value: `${sleepScore}%` },
-          { label: 'Active', value: activeMin > 0 ? `${activeMin}m` : '—' },
-        ].map(({ label, value }) => (
-          <div key={label} className="text-center">
-            <p className="text-[9px] font-mono uppercase tracking-wider text-zinc-700">{label}</p>
-            <p className="text-sm font-mono font-semibold text-white mt-1">{value}</p>
+      <div className="rounded-xl bg-[#0f0f0f] border border-white/[0.06] overflow-hidden">
+        {projects.length > 0 ? (
+          projects.map((p) => <ProjectRow key={p.id} project={p} />)
+        ) : (
+          <div className="px-4 py-6 text-center">
+            <p className="text-sm text-zinc-700">No active projects</p>
           </div>
-        ))}
+        )}
       </div>
     </div>
   )

@@ -1,144 +1,231 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { Upload, FileText, Image as ImageIcon, Music, Table, File } from 'lucide-react'
 import { JACKSON } from '@/lib/mock-data'
-import type { StackItem, CompoundTiming } from '@/lib/mock-data'
-import { getStorage, setStorage, STORAGE_KEYS, STORAGE_EVENTS, getTodayKey } from '@/lib/storage'
+import type { FileType, UploadedFile } from '@/lib/mock-data'
+import { getStorage, setStorage, STORAGE_KEYS } from '@/lib/storage'
 
-const STACK_RESET_KEY = 'picard_stack_reset_v1'
-
-const CATEGORY_STYLES = {
-  Performance: 'text-blue-400 bg-blue-400/10 border-blue-400/20',
-  Recovery: 'text-green-400 bg-green-400/10 border-green-400/20',
-  Health: 'text-teal-400 bg-teal-400/10 border-teal-400/20',
-  Stimulant: 'text-amber-400 bg-amber-400/10 border-amber-400/20',
-  Peptide: 'text-purple-400 bg-purple-400/10 border-purple-400/20',
+const FILE_ICONS: Record<FileType, { icon: typeof File; color: string }> = {
+  pdf: { icon: FileText, color: 'text-red-400' },
+  image: { icon: ImageIcon, color: 'text-blue-400' },
+  audio: { icon: Music, color: 'text-purple-400' },
+  csv: { icon: Table, color: 'text-green-400' },
+  text: { icon: FileText, color: 'text-zinc-400' },
 }
 
-const TIMING_ORDER: CompoundTiming[] = ['AM', 'With meals', 'Pre-workout', 'PM', 'As needed']
+const CATEGORIES = ['All', 'Health', 'Fitness', 'Nutrition', 'Finance', 'Projects']
 
-function StackRow({
-  item,
-  onToggle,
-}: {
-  item: StackItem
-  onToggle: (id: string) => void
-}) {
-  return (
-    <div
-      className={`flex items-center gap-3 px-4 py-3.5 border-b border-white/[0.05] last:border-0 transition-opacity duration-200 ${
-        item.takenToday ? 'opacity-100' : 'opacity-60'
-      }`}
-    >
-      <button
-        onClick={() => onToggle(item.id)}
-        className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 border transition-all duration-200 ${
-          item.takenToday
-            ? 'bg-green-400/20 border-green-400/40'
-            : 'bg-transparent border-white/20'
-        }`}
-        aria-label={item.takenToday ? 'Mark as not taken' : 'Mark as taken'}
-      >
-        {item.takenToday && (
-          <div className="w-2 h-2 rounded-full bg-green-400" />
-        )}
-      </button>
-
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <p className="text-sm font-medium text-white truncate">{item.name}</p>
-          {item.notes && (
-            <span className="text-[8px] text-zinc-700 truncate hidden sm:inline">{item.notes}</span>
-          )}
-        </div>
-        <p className="text-[10px] font-mono text-zinc-600 mt-0.5">{item.dose}</p>
-      </div>
-
-      <div className="flex items-center gap-2 flex-shrink-0">
-        <span
-          className={`text-[8px] font-mono px-2 py-0.5 rounded-full border uppercase tracking-wider ${CATEGORY_STYLES[item.category]}`}
-        >
-          {item.category}
-        </span>
-      </div>
-    </div>
-  )
+function detectType(name: string): FileType {
+  const ext = name.split('.').pop()?.toLowerCase() ?? ''
+  if (ext === 'pdf') return 'pdf'
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'].includes(ext)) return 'image'
+  if (['mp3', 'm4a', 'wav', 'ogg'].includes(ext)) return 'audio'
+  if (ext === 'csv') return 'csv'
+  return 'text'
 }
 
-export default function StackPage() {
-  const [items, setItems] = useState<StackItem[]>(JACKSON.stack)
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function fmtDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function readFileAsDataURL(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = () => reject(new Error('FileReader error'))
+    reader.readAsDataURL(file)
+  })
+}
+
+export default function UploadsPage() {
+  const [dragging, setDragging] = useState(false)
+  const [activeCategory, setActiveCategory] = useState('All')
+  const [uploads, setUploads] = useState<UploadedFile[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const activeCategoryRef = useRef(activeCategory)
 
   useEffect(() => {
-    const today = getTodayKey()
-    const lastReset = localStorage.getItem(STACK_RESET_KEY) ?? ''
-    let saved = getStorage<StackItem[]>(STORAGE_KEYS.STACK_STATE, JACKSON.stack)
+    activeCategoryRef.current = activeCategory
+  }, [activeCategory])
 
-    if (lastReset !== today) {
-      saved = saved.map((item) => ({ ...item, takenToday: false }))
-      setStorage(STORAGE_KEYS.STACK_STATE, saved)
-      localStorage.setItem(STACK_RESET_KEY, today)
-      window.dispatchEvent(new CustomEvent(STORAGE_EVENTS.STACK_UPDATED))
-    }
-
-    setItems(saved)
+  useEffect(() => {
+    const saved = getStorage<UploadedFile[]>(STORAGE_KEYS.UPLOAD_HISTORY, [])
+    setUploads(saved.length > 0 ? saved : JACKSON.uploads)
   }, [])
 
-  function toggle(id: string) {
-    setItems((prev) => {
-      const updated = prev.map((item) => (item.id === id ? { ...item, takenToday: !item.takenToday } : item))
-      setStorage(STORAGE_KEYS.STACK_STATE, updated)
+  async function addFiles(fileList: FileList | null) {
+    if (!fileList || fileList.length === 0) return
+    const now = new Date().toISOString()
+    const category = activeCategoryRef.current === 'All' ? 'General' : activeCategoryRef.current
+
+    const newEntries: UploadedFile[] = []
+    for (const f of Array.from(fileList)) {
+      const type = detectType(f.name)
+      let previewDataUrl: string | undefined
+      if (type === 'image' && f.size < 1_048_576) {
+        try {
+          previewDataUrl = await readFileAsDataURL(f)
+        } catch {
+          // no preview for this file
+        }
+      }
+      newEntries.push({
+        id: crypto.randomUUID(),
+        name: f.name,
+        type,
+        size: formatSize(f.size),
+        uploadedAt: fmtDate(now),
+        category,
+        previewDataUrl,
+      })
+    }
+
+    setUploads((prev) => {
+      const updated = [...newEntries, ...prev]
+      try {
+        setStorage(STORAGE_KEYS.UPLOAD_HISTORY, updated)
+      } catch {
+        // localStorage full — save without previews
+        const stripped = updated.map(({ previewDataUrl: _, ...rest }) => rest)
+        setStorage(STORAGE_KEYS.UPLOAD_HISTORY, stripped)
+      }
       return updated
     })
-    window.dispatchEvent(new CustomEvent(STORAGE_EVENTS.STACK_UPDATED))
+
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
-  const taken = items.filter((i) => i.takenToday).length
-  const total = items.length
+  function onDragOver(e: React.DragEvent) {
+    e.preventDefault()
+    setDragging(true)
+  }
 
-  const grouped = TIMING_ORDER.reduce<Record<string, StackItem[]>>((acc, timing) => {
-    const group = items.filter((i) => i.timing === timing)
-    if (group.length > 0) acc[timing] = group
-    return acc
-  }, {})
+  function onDragLeave() {
+    setDragging(false)
+  }
+
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setDragging(false)
+    addFiles(e.dataTransfer.files)
+  }
+
+  const filtered =
+    activeCategory === 'All'
+      ? uploads
+      : uploads.filter((f) => f.category === activeCategory)
 
   return (
     <div className="pb-4">
-      {/* Header */}
       <div className="px-4 pt-7 pb-4">
-        <p className="text-[10px] font-mono uppercase tracking-[0.12em] text-zinc-600">Compounds</p>
-        <h1 className="text-2xl font-semibold text-white mt-1 tracking-tight">Daily Stack</h1>
+        <p className="text-[10px] font-mono uppercase tracking-[0.12em] text-zinc-600">Knowledge Base</p>
+        <h1 className="text-2xl font-semibold text-white mt-1 tracking-tight">Upload Center</h1>
       </div>
 
-      {/* Progress summary */}
-      <div className="mx-4 mb-3 rounded-xl bg-[#111] border border-white/10 px-4 py-3.5 card-elevated">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs text-zinc-400 font-medium">{taken} of {total} taken today</span>
-          <span className="text-xs font-mono text-zinc-600">{Math.round((taken / total) * 100)}%</span>
+      {/* Drop zone */}
+      <div
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+        className={`mx-4 rounded-2xl border-2 border-dashed p-8 flex flex-col items-center gap-3 transition-all duration-200 ${
+          dragging
+            ? 'border-blue-500/60 bg-blue-500/5'
+            : 'border-white/10 bg-[#0f0f0f]'
+        }`}
+      >
+        <div
+          className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors duration-200 ${
+            dragging ? 'bg-blue-500/15' : 'bg-white/5'
+          }`}
+        >
+          <Upload size={22} className={dragging ? 'text-blue-400' : 'text-zinc-600'} />
         </div>
-        <div className="h-1 bg-white/10 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-green-500 rounded-full transition-all duration-500"
-            style={{ width: `${(taken / total) * 100}%` }}
+        <div className="text-center">
+          <p className="text-sm font-medium text-white">
+            {dragging ? 'Drop to upload' : 'Drop files here'}
+          </p>
+          <p className="text-xs text-zinc-600 mt-1">PDF, image, audio, CSV, text · Images under 1MB get preview</p>
+        </div>
+        <label className="mt-1 cursor-pointer">
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="sr-only"
+            multiple
+            accept=".pdf,.jpg,.jpeg,.png,.mp3,.m4a,.wav,.csv,.txt,.md"
+            onChange={(e) => addFiles(e.target.files)}
           />
-        </div>
+          <span className="text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors border border-blue-500/30 rounded-lg px-3 py-1.5">
+            Browse files
+          </span>
+        </label>
       </div>
 
-      {/* Disclaimer */}
-      <p className="mx-4 mb-3 text-[9px] text-zinc-700 font-mono leading-relaxed">
-        This is a personal tracking tool only. Not medical advice. Consult a physician before adding any compound.
-      </p>
+      {/* Category filter */}
+      <div className="mt-4 px-4 flex gap-2 no-scrollbar overflow-x-auto pb-1">
+        {CATEGORIES.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setActiveCategory(cat)}
+            className={`flex-shrink-0 text-[10px] font-mono uppercase tracking-wider px-3 py-1.5 rounded-full border transition-all duration-150 ${
+              activeCategory === cat
+                ? 'border-blue-500/40 text-blue-400 bg-blue-500/10'
+                : 'border-white/10 text-zinc-600 bg-[#111]'
+            }`}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
 
-      {/* Groups */}
-      {Object.entries(grouped).map(([timing, group]) => (
-        <div key={timing} className="mx-4 mt-2">
-          <p className="text-[9px] font-mono uppercase tracking-[0.14em] text-zinc-600 mb-1.5 px-1">{timing}</p>
-          <div className="rounded-xl bg-[#111] border border-white/10 overflow-hidden card-elevated">
-            {group.map((item) => (
-              <StackRow key={item.id} item={item} onToggle={toggle} />
-            ))}
-          </div>
+      {/* Upload history */}
+      <div className="mx-4 mt-3 rounded-2xl bg-[#111] border border-white/10 overflow-hidden card-elevated">
+        <div className="px-4 py-3 border-b border-white/[0.06]">
+          <p className="text-[9px] font-mono uppercase tracking-widest text-zinc-600">
+            {filtered.length} file{filtered.length !== 1 ? 's' : ''}
+          </p>
         </div>
-      ))}
+        {filtered.length === 0 ? (
+          <div className="px-4 py-8 text-center">
+            <p className="text-sm text-zinc-600">No files in this category</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-white/[0.05]">
+            {filtered.map((file) => {
+              const { icon: Icon, color } = FILE_ICONS[file.type]
+              return (
+                <div key={file.id} className="flex items-center gap-3 px-4 py-3">
+                  <div className="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    {file.previewDataUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={file.previewDataUrl} alt={file.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <Icon size={16} className={color} />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-white truncate">{file.name}</p>
+                    <p className="text-[9px] text-zinc-700 mt-0.5 font-mono">
+                      {file.category} · {file.size} · {file.uploadedAt}
+                    </p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      <p className="mx-4 mt-3 text-[9px] text-zinc-700 font-mono leading-relaxed">
+        Stored locally in browser. Image previews survive refresh for files under 1MB.
+      </p>
     </div>
   )
 }

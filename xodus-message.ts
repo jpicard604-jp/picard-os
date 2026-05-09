@@ -1,120 +1,123 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import {
-  getTodayLog,
-  getStorage,
-  getVoiceLogsToday,
-  getUploadsToday,
-  STORAGE_EVENTS,
-  STORAGE_KEYS,
-} from '@/lib/storage'
-import { generateXodusOutput } from '@/lib/xodus-message'
-import type { XodusOutput } from '@/lib/xodus-message'
-import type { UrgencyLevel, StackItem, UploadedFile } from '@/lib/mock-data'
-import { getProjects, getOverdueCount } from '@/lib/projects'
-import { getThisWeekLogs, getTodayActivity } from '@/lib/fitness'
+import { usePathname } from 'next/navigation'
+import { LayoutDashboard, MessageSquare, CalendarDays, FolderKanban, Activity, Pill, Mic, Upload, Settings } from 'lucide-react'
 import { JACKSON } from '@/lib/mock-data'
 
-const URGENCY_STYLES: Record<UrgencyLevel, { badge: string; dot: string }> = {
-  LOW:      { badge: 'text-green-400 bg-green-400/10 border-green-400/20',  dot: 'bg-green-400'  },
-  MODERATE: { badge: 'text-blue-400 bg-blue-400/10 border-blue-400/20',    dot: 'bg-blue-400'   },
-  HIGH:     { badge: 'text-amber-400 bg-amber-400/10 border-amber-400/20', dot: 'bg-amber-400'  },
-  CRITICAL: { badge: 'text-red-400 bg-red-400/10 border-red-400/20',       dot: 'bg-red-400'    },
-}
+const PRIMARY_NAV = [
+  { href: '/', icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/xodus', icon: MessageSquare, label: 'XODUS' },
+  { href: '/daily', icon: CalendarDays, label: 'Daily Log' },
+  { href: '/projects', icon: FolderKanban, label: 'Projects' },
+  { href: '/fitness', icon: Activity, label: 'Fitness' },
+] as const
 
-function buildExtras() {
-  const voiceLogs = getVoiceLogsToday()
-  const uploads = getUploadsToday<UploadedFile>()
-  const stackItems = getStorage<StackItem[]>(STORAGE_KEYS.STACK_STATE, JACKSON.stack)
-  const projects = getProjects()
-  const weekLogs = getThisWeekLogs()
-  const todayActivity = getTodayActivity()
+const SECONDARY_NAV = [
+  { href: '/stack', icon: Pill, label: 'Stack' },
+  { href: '/voice', icon: Mic, label: 'Voice' },
+  { href: '/uploads', icon: Upload, label: 'Uploads' },
+  { href: '/settings', icon: Settings, label: 'Settings' },
+] as const
 
-  return {
-    voiceLogsToday: voiceLogs.length,
-    uploadsToday: uploads.length,
-    stackTaken: stackItems.filter((i) => i.takenToday).length,
-    stackTotal: stackItems.length,
-    overdueProjects: getOverdueCount(projects),
-    weeklyWorkouts: weekLogs.length,
-    todayActivityLabel: todayActivity ? (todayActivity.label ?? todayActivity.type) : undefined,
-    todayActivityType: todayActivity?.type,
-  }
-}
+export default function Sidebar() {
+  const pathname = usePathname()
+  const recovery = JACKSON.today.recovery
 
-export default function XodusCard() {
-  const [output, setOutput] = useState<XodusOutput>(() => generateXodusOutput(null))
-
-  function refresh() {
-    const log = getTodayLog()
-    setOutput(generateXodusOutput(log, buildExtras()))
-  }
-
-  useEffect(() => {
-    refresh()
-    window.addEventListener(STORAGE_EVENTS.DAILY_LOG_UPDATED, refresh)
-    window.addEventListener(STORAGE_EVENTS.VOICE_LOG_SAVED, refresh)
-    window.addEventListener(STORAGE_EVENTS.ACTIVITY_LOG_UPDATED, refresh)
-    window.addEventListener(STORAGE_EVENTS.STACK_UPDATED, refresh)
-    window.addEventListener(STORAGE_EVENTS.PROJECTS_UPDATED, refresh)
-    return () => {
-      window.removeEventListener(STORAGE_EVENTS.DAILY_LOG_UPDATED, refresh)
-      window.removeEventListener(STORAGE_EVENTS.VOICE_LOG_SAVED, refresh)
-      window.removeEventListener(STORAGE_EVENTS.ACTIVITY_LOG_UPDATED, refresh)
-      window.removeEventListener(STORAGE_EVENTS.STACK_UPDATED, refresh)
-      window.removeEventListener(STORAGE_EVENTS.PROJECTS_UPDATED, refresh)
-    }
-  }, [])
-
-  const { paragraphs, urgency, focusRecommendation, loggedToday } = output
-  const styles = URGENCY_STYLES[urgency]
+  const recoveryColor =
+    recovery.score >= 70 ? 'text-green-400' : recovery.score >= 50 ? 'text-sky-400' : 'text-red-400'
+  const recoveryBarColor =
+    recovery.score >= 70 ? 'bg-green-500' : recovery.score >= 50 ? 'bg-sky-500' : 'bg-red-500'
 
   return (
-    <div className="mx-4 mt-3 rounded-xl bg-[#0d1117] border border-blue-500/[0.10] border-l-2 border-l-blue-500/40 glow-blue overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 pt-4 pb-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-1.5 h-1.5 rounded-full bg-blue-400 shadow-[0_0_6px_rgba(59,130,246,0.8)]" />
-          <span className="text-[10px] font-mono uppercase tracking-[0.14em] text-blue-400/80">XODUS Brief</span>
+    <aside className="hidden lg:flex flex-col fixed inset-y-0 left-0 w-60 z-40 bg-[#07070a] border-r border-white/[0.05]">
+      {/* Brand */}
+      <div className="px-5 py-[18px] border-b border-white/[0.05]">
+        <div className="flex items-center gap-3">
+          <div className="relative w-7 h-7 flex-shrink-0">
+            <div className="absolute inset-0 rounded-lg bg-gradient-to-br from-sky-500/20 to-indigo-600/15 border border-sky-500/20" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="font-display text-[10px] font-semibold text-sky-300 leading-none tracking-tight">JP</span>
+            </div>
+          </div>
+          <div>
+            <span className="font-display text-[13px] font-medium text-white leading-none tracking-tight">
+              Picard OS
+            </span>
+          </div>
         </div>
-        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[9px] font-mono uppercase tracking-wider ${styles.badge}`}>
-          <span className={`w-1 h-1 rounded-full ${styles.dot}`} />
-          {urgency}
-        </span>
       </div>
 
-      {/* Intelligence prose */}
-      <div className="px-5 pb-4 space-y-2.5">
-        {paragraphs.slice(0, 2).map((para, i) => (
-          <p key={i} className="text-sm text-zinc-300 leading-relaxed">{para}</p>
-        ))}
-      </div>
+      {/* Primary nav */}
+      <nav className="flex-1 px-3 py-4 space-y-px overflow-y-auto no-scrollbar">
+        {PRIMARY_NAV.map(({ href, icon: Icon, label }) => {
+          const active = pathname === href
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all duration-150 group ${
+                active
+                  ? 'bg-white/[0.06] text-white'
+                  : 'text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.035]'
+              }`}
+            >
+              <Icon
+                size={15}
+                strokeWidth={active ? 2 : 1.75}
+                className={active ? 'text-sky-400' : 'text-zinc-600 group-hover:text-zinc-400 transition-colors'}
+              />
+              {label}
+              {active && (
+                <span className="ml-auto w-1 h-1 rounded-full bg-sky-400/60" />
+              )}
+            </Link>
+          )
+        })}
 
-      {/* Focus line */}
-      {focusRecommendation && (
-        <div className="px-5 py-3 border-t border-white/[0.05]">
-          <span className="text-[9px] font-mono uppercase tracking-wider text-zinc-700 block mb-1">Focus</span>
-          <p className="text-xs text-zinc-400 leading-relaxed">{focusRecommendation}</p>
+        <div className="pt-5 pb-2 px-3">
+          <span className="text-[9px] font-mono uppercase tracking-[0.16em] text-zinc-700">Tools</span>
         </div>
-      )}
 
-      {/* CTA */}
-      <div className="px-5 py-3.5 border-t border-white/[0.05] flex items-center justify-between">
-        <Link
-          href="/xodus"
-          className="text-[12px] text-blue-400 hover:text-blue-300 transition-colors font-medium"
-        >
-          Talk to XODUS →
-        </Link>
-        <Link
-          href="/daily"
-          className="text-[11px] text-zinc-600 hover:text-zinc-400 transition-colors"
-        >
-          {loggedToday ? 'Update log' : 'Log today'}
-        </Link>
+        {SECONDARY_NAV.map(({ href, icon: Icon, label }) => {
+          const active = pathname === href
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all duration-150 group ${
+                active
+                  ? 'bg-white/[0.06] text-white'
+                  : 'text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.035]'
+              }`}
+            >
+              <Icon
+                size={15}
+                strokeWidth={active ? 2 : 1.75}
+                className={active ? 'text-sky-400' : 'text-zinc-600 group-hover:text-zinc-400 transition-colors'}
+              />
+              {label}
+            </Link>
+          )
+        })}
+      </nav>
+
+      {/* Recovery footer */}
+      <div className="px-5 py-4 border-t border-white/[0.05]">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[9px] font-mono uppercase tracking-[0.14em] text-zinc-700">Recovery</span>
+          <span className={`text-[10px] font-mono font-semibold ${recoveryColor}`}>{recovery.score}%</span>
+        </div>
+        <div className="h-px bg-white/[0.07] rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full ${recoveryBarColor} transition-all`}
+            style={{ width: `${recovery.score}%` }}
+          />
+        </div>
+        <p className="text-[9px] text-zinc-700 mt-2 font-mono">
+          HRV {recovery.hrv}ms · RHR {recovery.restingHR}bpm
+        </p>
       </div>
-    </div>
+    </aside>
   )
 }
