@@ -23,7 +23,12 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\jpica\\\\Projects\\\\picard-os\" -Force)",
       "Bash(Select-Object Name, FullName)",
       "Bash(npm audit *)",
-      "Bash(npx shadcn@latest *)"
+      "Bash(npx shadcn@latest *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\jpica\\\\.claude\" -Force)",
+      "Bash(Select-Object Name, LastWriteTime)",
+      "PowerShell(Test-Path *)",
+      "PowerShell(claude mcp *)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\jpica\\\\Projects\\\\picard-os\\\\.claude-flow\" -Force -Recurse | Select-Object -ExpandProperty FullName | ForEach-Object { $_.Replace\\(\"C:\\\\Users\\\\jpica\\\\Projects\\\\picard-os\\\\\", \"\"\\) })"
     ]
   }
 }

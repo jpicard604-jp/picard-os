@@ -1,5 +1,5 @@
-import { JACKSON } from './mock-data'
 import type { DailyLog } from './storage'
+import { getAlcoholStreak } from './storage'
 
 export type RecoveryLevel = 'ADAPTED' | 'RECOVERING' | 'STRAINED'
 export type DisciplineLevel = 'LOCKED_IN' | 'CONSISTENT' | 'SLIPPING' | 'OFF'
@@ -32,6 +32,9 @@ export interface DailyStatusExtras {
   activityMinutesToday?: number
   todayActivityLabel?: string  // e.g. "Upper — Chest & Back" or "Run"
   todayActivityType?: string   // ActivityType value
+  // Override path for recovery data (e.g. from WHOOP API when connected)
+  recoveryScoreOverride?: number
+  noDrinkStreakOverride?: number
 }
 
 export interface DailyStatus {
@@ -53,15 +56,12 @@ export function generateDailyStatus(
   log: DailyLog | null,
   extras: DailyStatusExtras = {}
 ): DailyStatus {
-  const rec = JACKSON.today.recovery
-  const nutr = JACKSON.today.nutrition
-  const screen = JACKSON.today.screenTime
-  const streaks = JACKSON.today.streaks
-
-  const pTarget = log?.proteinTarget ?? nutr.protein.target
-  const cTarget = log?.calorieTarget ?? nutr.calories.target
-  const screenTarget = screen.target
-  const noDrinkStreak = streaks.noDrinking
+  const pTarget = log?.proteinTarget ?? 180
+  const cTarget = log?.calorieTarget ?? 2500
+  const screenTarget = 2
+  const noDrinkStreak = extras.noDrinkStreakOverride ?? getAlcoholStreak()
+  // Recovery: prefer log entry, then extras override, then null (no data)
+  const recScore = extras.recoveryScoreOverride ?? log?.recoveryScore ?? null
 
   const protein = log?.protein ?? null
   const calories = log?.calories ?? null
@@ -84,9 +84,17 @@ export function generateDailyStatus(
   const stepsToday = log?.steps ?? null
   const stackPct = stackTotal > 0 ? stackTaken / stackTotal : 0
 
-  // Recovery score (0-20)
-  let recoveryScore = rec.score >= 70 ? 20 : rec.score >= 50 ? 12 : 5
-  if (sleepHours !== null) {
+  // Recovery score (0-20) — uses logged recovery score when available, else sleep-only estimate
+  let recoveryScore: number
+  if (recScore !== null) {
+    recoveryScore = recScore >= 70 ? 20 : recScore >= 50 ? 12 : 5
+  } else if (sleepHours !== null) {
+    // Estimate from sleep alone when no recovery logged
+    recoveryScore = sleepHours >= 8 ? 16 : sleepHours >= 7 ? 12 : sleepHours >= 6 ? 8 : 4
+  } else {
+    recoveryScore = 10 // neutral — no data
+  }
+  if (sleepHours !== null && recScore !== null) {
     if (sleepHours >= 8) recoveryScore = Math.min(20, recoveryScore + 3)
     else if (sleepHours < 6) recoveryScore = Math.max(0, recoveryScore - 5)
   }
@@ -166,7 +174,10 @@ export function generateDailyStatus(
     executionScore >= 75 ? 'LOW' : executionScore >= 55 ? 'MODERATE' : executionScore >= 35 ? 'HIGH' : 'CRITICAL'
 
   const recoveryLevel: RecoveryLevel =
-    rec.score >= 70 ? 'ADAPTED' : rec.score >= 50 ? 'RECOVERING' : 'STRAINED'
+    recScore === null ? 'RECOVERING'
+    : recScore >= 70 ? 'ADAPTED'
+    : recScore >= 50 ? 'RECOVERING'
+    : 'STRAINED'
 
   const disciplineLevel: DisciplineLevel =
     disciplineScore >= 18 ? 'LOCKED_IN' :
@@ -208,7 +219,7 @@ export function generateDailyStatus(
   if (stepsToday !== null && stepsToday < 4000 && log && activityMinutesToday === 0) {
     alerts.push({ level: 'info', message: `Steps low at ${stepsToday.toLocaleString()} — get moving`, category: 'logging' })
   }
-  if (log && activityMinutesToday === 0 && rec.score >= 70) {
+  if (log && activityMinutesToday === 0 && recScore !== null && recScore >= 70) {
     alerts.push({ level: 'info', message: 'Recovery is green — no activity logged yet', category: 'logging' })
   }
   if (sleepHours !== null && sleepHours < 6.5) {
@@ -220,7 +231,7 @@ export function generateDailyStatus(
 
   // Strengths
   const strengths: string[] = []
-  if (rec.score >= 70) strengths.push(`Recovery ${rec.score} — system adapted`)
+  if (recScore !== null && recScore >= 70) strengths.push(`Recovery ${recScore} — system adapted`)
   if (noDrinkStreak >= 14) strengths.push(`${noDrinkStreak}d no alcohol`)
   if (protein !== null && protein >= pTarget * 0.9) strengths.push(`Protein locked — ${protein}g`)
   if (!smoked && !drank) strengths.push('Clean day')

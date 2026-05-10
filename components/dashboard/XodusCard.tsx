@@ -2,66 +2,62 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Activity } from 'lucide-react'
-import {
-  getTodayLog,
-  getStorage,
-  getVoiceLogsToday,
-  getUploadsToday,
-  STORAGE_EVENTS,
-  STORAGE_KEYS,
-} from '@/lib/storage'
-import { generateXodusOutput } from '@/lib/xodus-message'
-import type { XodusOutput } from '@/lib/xodus-message'
-import type { StackItem, UploadedFile } from '@/lib/mock-data'
-import { getProjects, getOverdueCount } from '@/lib/projects'
-import { getThisWeekLogs, getTodayActivity } from '@/lib/fitness'
-import { JACKSON } from '@/lib/mock-data'
+import { Zap } from 'lucide-react'
+import { STORAGE_EVENTS } from '@/lib/storage'
+import { gatherBrainInput, runXodusBrain } from '@/lib/xodus/brain'
+import type { XodusBrainOutput, BrainInsight } from '@/lib/xodus/brain'
 
-function buildExtras() {
-  const voiceLogs = getVoiceLogsToday()
-  const uploads = getUploadsToday<UploadedFile>()
-  const stackItems = getStorage<StackItem[]>(STORAGE_KEYS.STACK_STATE, JACKSON.stack)
-  const projects = getProjects()
-  const weekLogs = getThisWeekLogs()
-  const todayActivity = getTodayActivity()
-  return {
-    voiceLogsToday: voiceLogs.length,
-    uploadsToday: uploads.length,
-    stackTaken: stackItems.filter((i) => i.takenToday).length,
-    stackTotal: stackItems.length,
-    overdueProjects: getOverdueCount(projects),
-    weeklyWorkouts: weekLogs.length,
-    todayActivityLabel: todayActivity ? (todayActivity.label ?? todayActivity.type) : undefined,
-    todayActivityType: todayActivity?.type,
-  }
+const LEVEL_DOT: Record<BrainInsight['level'], string> = {
+  critical: 'bg-pink-400 shadow-[0_0_5px_rgba(236,72,153,0.6)]',
+  warning:  'bg-purple-400',
+  info:     'bg-zinc-500',
+  positive: 'bg-cyan-400',
+}
+
+function InsightRow({ insight }: { insight: BrainInsight }) {
+  return (
+    <Link
+      href={insight.href}
+      className="flex items-start gap-2.5 py-2.5 border-b border-white/[0.04] last:border-0 group"
+    >
+      <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1.5 ${LEVEL_DOT[insight.level]}`} />
+      <div className="flex-1 min-w-0">
+        <p className="text-[12px] text-zinc-300 leading-snug">{insight.headline}</p>
+        {insight.action && (
+          <p className="text-[10px] font-mono text-zinc-600 mt-0.5 group-hover:text-zinc-500 transition-colors">
+            {insight.action} →
+          </p>
+        )}
+      </div>
+    </Link>
+  )
 }
 
 export default function XodusCard() {
-  const [output, setOutput] = useState<XodusOutput>(() => generateXodusOutput(null))
+  const [brain, setBrain] = useState<XodusBrainOutput>(() =>
+    runXodusBrain(gatherBrainInput())
+  )
 
   function refresh() {
-    const log = getTodayLog()
-    setOutput(generateXodusOutput(log, buildExtras()))
+    setBrain(runXodusBrain(gatherBrainInput()))
   }
 
   useEffect(() => {
     refresh()
-    window.addEventListener(STORAGE_EVENTS.DAILY_LOG_UPDATED, refresh)
-    window.addEventListener(STORAGE_EVENTS.VOICE_LOG_SAVED, refresh)
-    window.addEventListener(STORAGE_EVENTS.ACTIVITY_LOG_UPDATED, refresh)
-    window.addEventListener(STORAGE_EVENTS.STACK_UPDATED, refresh)
-    window.addEventListener(STORAGE_EVENTS.PROJECTS_UPDATED, refresh)
-    return () => {
-      window.removeEventListener(STORAGE_EVENTS.DAILY_LOG_UPDATED, refresh)
-      window.removeEventListener(STORAGE_EVENTS.VOICE_LOG_SAVED, refresh)
-      window.removeEventListener(STORAGE_EVENTS.ACTIVITY_LOG_UPDATED, refresh)
-      window.removeEventListener(STORAGE_EVENTS.STACK_UPDATED, refresh)
-      window.removeEventListener(STORAGE_EVENTS.PROJECTS_UPDATED, refresh)
-    }
+    const events = [
+      STORAGE_EVENTS.DAILY_LOG_UPDATED,
+      STORAGE_EVENTS.VOICE_LOG_SAVED,
+      STORAGE_EVENTS.ACTIVITY_LOG_UPDATED,
+      STORAGE_EVENTS.STACK_UPDATED,
+      STORAGE_EVENTS.PROJECTS_UPDATED,
+    ]
+    events.forEach((e) => window.addEventListener(e, refresh))
+    return () => events.forEach((e) => window.removeEventListener(e, refresh))
   }, [])
 
-  const { paragraphs, focusRecommendation, loggedToday } = output
+  const { brief, nextAction, insights, executionScore, urgency, loggedToday } = brain
+  const topInsights = insights.filter((i) => i.level === 'critical' || i.level === 'warning').slice(0, 3)
+  const urgencyColor = urgency === 'LOW' ? 'text-cyan-400' : urgency === 'MODERATE' ? 'text-purple-400' : 'text-pink-400'
 
   return (
     <div
@@ -72,33 +68,54 @@ export default function XodusCard() {
       }}
     >
       {/* Header */}
-      <div className="flex items-center gap-2.5 mb-4">
-        <Activity size={14} className="text-pink-400 flex-shrink-0" strokeWidth={2.5} />
-        <p className="text-[11px] font-mono uppercase tracking-[0.18em] text-pink-400 font-semibold">
-          XODUS AI Coach Insight
-        </p>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Zap size={13} className="text-pink-400 flex-shrink-0" strokeWidth={2.5} />
+          <p className="text-[11px] font-mono uppercase tracking-[0.18em] text-pink-400 font-semibold">
+            XODUS
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[9px] font-mono text-zinc-600">Score</span>
+          <span className="text-[11px] font-mono font-bold text-white">{executionScore}</span>
+          <span className={`text-[8px] font-mono uppercase tracking-wider ${urgencyColor}`}>{urgency}</span>
+        </div>
       </div>
 
-      {/* Prose */}
-      <div className="space-y-2 mb-5">
-        {paragraphs.slice(0, 3).map((para, i) => (
+      {/* Brief */}
+      <div className="space-y-2 mb-4">
+        {brief.slice(0, 2).map((para, i) => (
           <p key={i} className="text-[13px] text-zinc-300 leading-relaxed">{para}</p>
         ))}
-        {focusRecommendation && (
-          <p className="text-[12px] text-zinc-500 italic leading-relaxed">{focusRecommendation}</p>
-        )}
       </div>
 
-      {/* Buttons */}
+      {/* Top insights (warnings/critical only) */}
+      {topInsights.length > 0 && (
+        <div className="mb-4 bg-white/[0.02] rounded-xl px-2 py-1">
+          {topInsights.map((insight) => (
+            <InsightRow key={insight.id} insight={insight} />
+          ))}
+        </div>
+      )}
+
+      {/* Next action */}
+      <Link
+        href={nextAction.href}
+        className="block w-full py-2.5 px-4 rounded-xl bg-pink-500/[0.08] border border-pink-500/20 text-[12px] font-medium text-pink-300 hover:bg-pink-500/[0.14] transition-colors mb-3"
+      >
+        → {nextAction.text}
+      </Link>
+
+      {/* Footer */}
       <div className="flex items-center gap-3 justify-end">
         <Link
           href="/xodus"
           className="px-4 py-1.5 rounded-full border border-white/20 bg-white/[0.06] text-[11px] font-medium text-white hover:bg-white/[0.10] transition-colors"
         >
-          View Plan
+          Full Brief
         </Link>
         <Link
-          href={loggedToday ? '/daily' : '/daily'}
+          href="/daily"
           className="px-4 py-1.5 rounded-full border border-white/20 bg-white/[0.06] text-[11px] font-medium text-white hover:bg-white/[0.10] transition-colors"
         >
           {loggedToday ? 'Update Log' : 'Log Today'}

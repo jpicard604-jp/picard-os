@@ -13,8 +13,9 @@ import {
   ACTIVITY_TYPE_COLORS,
 } from '@/lib/fitness'
 import type { ActivityLog, ActivityType, ExerciseSet } from '@/lib/fitness'
-import { JACKSON } from '@/lib/mock-data'
-import { STORAGE_EVENTS } from '@/lib/storage'
+import { STORAGE_EVENTS, getTodayLog } from '@/lib/storage'
+import type { DailyLog } from '@/lib/storage'
+import Link from 'next/link'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -564,30 +565,66 @@ function IntegrationCard({ name, tagline, dataPoints, setupPath, accentClass }: 
 // ─── Recovery Card ─────────────────────────────────────────────────────────────
 
 function RecoveryCard() {
-  const { recovery } = JACKSON.today
-  const scoreColor = recovery.score >= 70 ? 'text-green-400' : recovery.score >= 50 ? 'text-amber-400' : 'text-red-400'
+  const [log, setLog] = useState<DailyLog | null>(null)
+
+  useEffect(() => {
+    const refresh = () => setLog(getTodayLog())
+    refresh()
+    window.addEventListener(STORAGE_EVENTS.DAILY_LOG_UPDATED, refresh)
+    return () => window.removeEventListener(STORAGE_EVENTS.DAILY_LOG_UPDATED, refresh)
+  }, [])
+
+  const score = log?.recoveryScore ?? null
+  const hrv = log?.hrv ?? null
+  const restingHR = log?.restingHR ?? null
+  const sleepHours = log?.sleepHours ?? null
+  const strain = log?.strain ?? null
+  const hasData = score !== null || hrv !== null || restingHR !== null
+
+  const scoreColor = score === null ? 'text-zinc-600'
+    : score >= 70 ? 'text-cyan-400'
+    : score >= 50 ? 'text-purple-400'
+    : 'text-pink-400'
+
+  const stateLabel = score === null ? 'No data'
+    : score >= 70 ? 'ADAPTED'
+    : score >= 50 ? 'RECOVERING'
+    : 'STRAINED'
+
+  const stateColor = score === null ? 'text-zinc-600'
+    : score >= 70 ? 'text-cyan-400'
+    : score >= 50 ? 'text-purple-400'
+    : 'text-pink-400'
+
   return (
-    <div className="mx-4 mt-3 rounded-2xl bg-[#181818] border border-white/[0.06] p-5 card-elevated glow-cyan">
+    <div className="mx-4 mt-3 rounded-2xl bg-[#181818] border border-white/[0.06] p-5 card-elevated">
       <div className="flex items-center justify-between mb-4">
-        <p className="text-[9px] font-mono uppercase tracking-widest text-zinc-600">Recovery · WHOOP (mock)</p>
-        <span className="text-[9px] font-mono text-zinc-700 bg-zinc-800/60 px-2 py-0.5 rounded-full">Estimated</span>
+        <p className="text-[9px] font-mono uppercase tracking-widest text-zinc-600">Recovery</p>
+        {!hasData ? (
+          <Link href="/daily" className="text-[9px] font-mono text-cyan-400/60 hover:text-cyan-400 transition-colors">
+            Log recovery →
+          </Link>
+        ) : (
+          <span className="text-[9px] font-mono text-zinc-700 bg-zinc-800/60 px-2 py-0.5 rounded-full">from daily log</span>
+        )}
       </div>
-      <div className="grid grid-cols-4 gap-2 text-center">
+      <div className="grid grid-cols-5 gap-2 text-center">
         {[
-          { label: 'Recovery', value: `${recovery.score}%`, color: scoreColor },
-          { label: 'HRV', value: `${recovery.hrv}ms`, color: 'text-white' },
-          { label: 'RHR', value: `${recovery.restingHR}`, color: 'text-white' },
-          { label: 'Sleep', value: `${recovery.sleepHours}h`, color: 'text-cyan-400' },
+          { label: 'Recovery', value: score !== null ? `${score}%` : '—', color: scoreColor },
+          { label: 'HRV', value: hrv !== null ? `${hrv}ms` : '—', color: 'text-white' },
+          { label: 'RHR', value: restingHR !== null ? `${restingHR}` : '—', color: 'text-white' },
+          { label: 'Sleep', value: sleepHours !== null ? `${sleepHours}h` : '—', color: 'text-cyan-400' },
+          { label: 'Strain', value: strain !== null ? `${strain}` : '—', color: 'text-purple-400' },
         ].map(({ label, value, color }) => (
           <div key={label}>
             <p className="text-[8px] font-mono uppercase tracking-wider text-zinc-700">{label}</p>
-            <p className={`text-lg font-mono font-bold mt-1 leading-none ${color}`}>{value}</p>
+            <p className={`text-sm font-mono font-bold mt-1 leading-none ${color}`}>{value}</p>
           </div>
         ))}
       </div>
       <div className="mt-4 pt-3 border-t border-white/[0.06] flex items-center justify-between">
         <span className="text-xs text-zinc-600">State</span>
-        <span className="text-xs font-mono text-green-400">{recovery.state}</span>
+        <span className={`text-xs font-mono ${stateColor}`}>{stateLabel}</span>
       </div>
     </div>
   )

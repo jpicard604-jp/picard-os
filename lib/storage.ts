@@ -24,6 +24,7 @@ export interface DailyLog {
   weight: number | null
   water: number | null
   sleepHours: number | null
+  sleepQuality: number | null  // 0-100
   steps: number | null
   screenTime: number | null
   instagramTime: number | null
@@ -32,6 +33,11 @@ export interface DailyLog {
   confidenceScore: number | null
   mood: number | null
   notes: string
+  // Recovery / WHOOP fields (manual entry until real API connects)
+  recoveryScore: number | null   // 0-100
+  hrv: number | null             // ms
+  restingHR: number | null       // bpm
+  strain: number | null          // 0-21
   savedAt: string
 }
 
@@ -56,6 +62,7 @@ export function emptyLog(date: string): DailyLog {
     weight: null,
     water: null,
     sleepHours: null,
+    sleepQuality: null,
     steps: null,
     screenTime: null,
     instagramTime: null,
@@ -64,8 +71,35 @@ export function emptyLog(date: string): DailyLog {
     confidenceScore: null,
     mood: null,
     notes: '',
+    recoveryScore: null,
+    hrv: null,
+    restingHR: null,
+    strain: null,
     savedAt: '',
   }
+}
+
+// Count consecutive past days (not including today) where drankToday === false.
+// Returns 0 when no history. Returns the actual streak count from stored logs.
+export function getAlcoholStreak(): number {
+  if (typeof window === 'undefined') return 0
+  const all = getStorage<Record<string, DailyLog>>(STORAGE_KEYS.DAILY_LOGS, {})
+  let streak = 0
+  const today = new Date()
+  for (let i = 1; i <= 365; i++) {
+    const d = new Date(today)
+    d.setDate(today.getDate() - i)
+    const key = d.toISOString().slice(0, 10)
+    const log = all[key]
+    if (!log) break
+    if (log.drankToday) break
+    streak++
+  }
+  // Also check today's log if it exists and says no drink
+  const todayKey = getTodayKey()
+  const todayLog = all[todayKey]
+  if (todayLog && !todayLog.drankToday) streak++
+  return streak
 }
 
 export function getStorage<T>(key: string, fallback: T): T {

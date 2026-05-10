@@ -11,7 +11,6 @@ import {
   STORAGE_KEYS,
 } from '@/lib/storage'
 import type { DailyLog } from '@/lib/storage'
-import { JACKSON } from '@/lib/mock-data'
 
 function NumInput({
   label,
@@ -150,13 +149,9 @@ export default function LogPage() {
     setTimeout(() => setSaved(false), 2500)
   }
 
-  const { protein, calories, screenTime } = JACKSON.today.nutrition
-    ? {
-        protein: JACKSON.today.nutrition.protein,
-        calories: JACKSON.today.nutrition.calories,
-        screenTime: JACKSON.today.screenTime,
-      }
-    : { protein: { target: 180 }, calories: { target: 2500 }, screenTime: { target: 2 } }
+  const protein = { target: 180 }
+  const calories = { target: 2500 }
+  const screenTime = { target: 2 }
 
   return (
     <div className="pb-8">
@@ -216,7 +211,7 @@ export default function LogPage() {
             value={form.screenTime}
             onChange={(v) => update('screenTime', v)}
             placeholder="0.0"
-            hint={`target ${JACKSON.today.screenTime.target}h`}
+            hint={`target ${screenTime.target}h`}
             unit="hours"
             decimal
           />

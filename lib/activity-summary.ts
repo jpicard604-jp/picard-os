@@ -1,6 +1,5 @@
 import { getTodayLog } from './storage'
 import { getActivityLogs, getThisWeekLogs } from './fitness'
-import { JACKSON } from './mock-data'
 
 export type BalanceStatus = 'PUSH' | 'OPTIMAL' | 'MONITOR' | 'OVERREACHING' | 'REST'
 
@@ -45,7 +44,7 @@ export function getDailyActivitySummary(): DailyActivitySummary {
   const log = getTodayLog()
   const allLogs = getActivityLogs()
   const weekLogs = getThisWeekLogs()
-  const recoveryScore = JACKSON.today.recovery.score
+  const recoveryScore = log?.recoveryScore ?? null
 
   // Today's activities
   const todayLogs = allLogs.filter((l) => l.date === todayStr)
@@ -81,7 +80,10 @@ export function getDailyActivitySummary(): DailyActivitySummary {
   let balanceStatus: BalanceStatus
   let balanceLabel: string
 
-  if (recoveryScore >= 70 && !hasActivityToday) {
+  if (recoveryScore === null) {
+    balanceStatus = hasActivityToday ? 'OPTIMAL' : 'PUSH'
+    balanceLabel = hasActivityToday ? 'Activity logged — log recovery score for full picture' : 'Log recovery score to calibrate load'
+  } else if (recoveryScore >= 70 && !hasActivityToday) {
     balanceStatus = 'PUSH'
     balanceLabel = 'Green light — ready to train'
   } else if (recoveryScore >= 70 && hasActivityToday) {

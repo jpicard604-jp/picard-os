@@ -1,5 +1,5 @@
-import { JACKSON } from './mock-data'
 import { generateDailyStatus } from './daily-status'
+import { getAlcoholStreak } from './storage'
 import type { DailyLog } from './storage'
 import type { DailyStatusExtras, DailyStatus } from './daily-status'
 import type { UrgencyLevel } from './mock-data'
@@ -40,13 +40,9 @@ function buildParagraphs(
   log: DailyLog | null,
   extras?: DailyStatusExtras
 ): string[] {
-  const rec = JACKSON.today.recovery
-  const nutr = JACKSON.today.nutrition
-  const screen = JACKSON.today.screenTime
-  const streaks = JACKSON.today.streaks
-
-  const pTarget = log?.proteinTarget ?? nutr.protein.target
-  const cTarget = log?.calorieTarget ?? nutr.calories.target
+  const pTarget = log?.proteinTarget ?? 180
+  const cTarget = log?.calorieTarget ?? 2500
+  const screenTarget = 2
   const protein = log?.protein ?? null
   const calories = log?.calories ?? null
   const screenTime = log?.screenTime ?? null
@@ -56,7 +52,10 @@ function buildParagraphs(
   const confidence = log?.confidenceScore ?? null
   const mood = log?.mood ?? null
   const sleepHours = log?.sleepHours ?? null
-  const noDrinkStreak = streaks.noDrinking
+  const recScore = extras?.recoveryScoreOverride ?? log?.recoveryScore ?? null
+  const recHrv = log?.hrv ?? null
+  const recRestingHR = log?.restingHR ?? null
+  const noDrinkStreak = extras?.noDrinkStreakOverride ?? getAlcoholStreak()
 
   const voiceLogsToday = extras?.voiceLogsToday ?? 0
   const stackTaken = extras?.stackTaken ?? 0
@@ -71,10 +70,19 @@ function buildParagraphs(
   const sleepNote = sleepHours !== null
     ? ` Sleep at ${sleepHours}h — ${sleepHours >= 7.5 ? 'solid.' : sleepHours >= 6 ? 'short of optimal.' : 'recovery is compromised.'}`
     : ''
-  paras.push(
-    `Recovery at ${rec.score} — HRV ${rec.hrv}ms, resting HR ${rec.restingHR}bpm. System is ${status.recoveryLevel.toLowerCase()}.${sleepNote}` +
-    (rec.score >= 70 ? ' Body absorbed the load. Ready to push.' : ' Dial back intensity today.')
-  )
+  if (recScore !== null) {
+    const hrvNote = recHrv !== null ? `, HRV ${recHrv}ms` : ''
+    const hrNote = recRestingHR !== null ? `, resting HR ${recRestingHR}bpm` : ''
+    paras.push(
+      `Recovery at ${recScore}${hrvNote}${hrNote}. System is ${status.recoveryLevel.toLowerCase()}.${sleepNote}` +
+      (recScore >= 70 ? ' Body absorbed the load. Ready to push.' : recScore >= 50 ? ' Moderate recovery — manage intensity.' : ' Low recovery — back off and restore.')
+    )
+  } else {
+    const sleepBase = sleepHours !== null
+      ? `Sleep at ${sleepHours}h — ${sleepHours >= 7.5 ? 'good base for the day.' : sleepHours >= 6 ? 'manageable.' : 'recovery is compromised.'}`
+      : 'No recovery data logged yet.'
+    paras.push(`${sleepBase} Log your recovery score for a full picture.`)
+  }
 
   // Nutrition paragraph
   if (protein !== null && calories !== null) {
@@ -97,12 +105,12 @@ function buildParagraphs(
 
   // Screen time + discipline paragraph
   if (screenTime !== null) {
-    const over = screenTime - screen.target
+    const over = screenTime - screenTarget
     const igPart = instagram !== null ? ` Instagram: ${instagram}h of that.` : ''
     paras.push(
       over > 0
-        ? `Screen time at ${screenTime}h — ${over.toFixed(1)}h over your ${screen.target}h cap.${igPart} That bandwidth belongs to your work.`
-        : `Screen time at ${screenTime}h — under your ${screen.target}h cap.${igPart} Protect that window.`
+        ? `Screen time at ${screenTime}h — ${over.toFixed(1)}h over your ${screenTarget}h cap.${igPart} That bandwidth belongs to your work.`
+        : `Screen time at ${screenTime}h — under your ${screenTarget}h cap.${igPart} Protect that window.`
     )
   }
 
@@ -161,7 +169,7 @@ function buildParagraphs(
   }
 
   // Context-aware coaching: high activity + low recovery
-  if (stepsToday !== null && stepsToday >= 8000 && rec.score < 60) {
+  if (stepsToday !== null && stepsToday >= 8000 && recScore !== null && recScore < 60) {
     paras.push(`You hit ${stepsToday.toLocaleString()} steps, so activity isn't the problem — recovery is. Keep the lift controlled, hit protein, and don't let today become an ego session.`)
   } else if (activityLines.length > 0) {
     paras.push(activityLines.join(' ') + (activityLines[activityLines.length - 1].endsWith('.') ? '' : '.'))

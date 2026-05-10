@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { JACKSON } from '@/lib/mock-data'
 import { getDailyActivitySummary } from '@/lib/activity-summary'
-import { STORAGE_EVENTS } from '@/lib/storage'
+import { STORAGE_EVENTS, getTodayLog, getTodayKey } from '@/lib/storage'
+import type { DailyLog } from '@/lib/storage'
 
 type RingProps = {
   value: number
@@ -57,12 +57,14 @@ function Ring({ value, max, color, label, unit, size = 88, strokeWidth = 7 }: Ri
 }
 
 export default function FitnessWidget() {
-  const { score, hrv, restingHR, sleepHours, sleepScore, strain } = JACKSON.today.recovery
-  const glowClass = score >= 70 ? 'glow-green' : score >= 50 ? 'glow-amber' : 'glow-red'
+  const [log, setLog] = useState<DailyLog | null>(null)
   const [activeMin, setActiveMin] = useState(0)
 
   useEffect(() => {
-    const refresh = () => setActiveMin(getDailyActivitySummary().activeMinutesToday)
+    const refresh = () => {
+      setLog(getTodayLog())
+      setActiveMin(getDailyActivitySummary().activeMinutesToday)
+    }
     refresh()
     window.addEventListener(STORAGE_EVENTS.ACTIVITY_LOG_UPDATED, refresh)
     window.addEventListener(STORAGE_EVENTS.DAILY_LOG_UPDATED, refresh)
@@ -72,24 +74,32 @@ export default function FitnessWidget() {
     }
   }, [])
 
+  const score = log?.recoveryScore ?? null
+  const hrv = log?.hrv ?? null
+  const restingHR = log?.restingHR ?? null
+  const sleepHours = log?.sleepHours ?? null
+  const sleepQuality = log?.sleepQuality ?? null
+  const strain = log?.strain ?? null
+  const glowClass = score === null ? '' : score >= 70 ? 'glow-green' : score >= 50 ? 'glow-amber' : 'glow-red'
+
   return (
     <div className={`mx-4 mt-3 rounded-2xl bg-[#111] border border-white/10 p-5 card-elevated ${glowClass}`}>
       <div className="flex items-center justify-between mb-5">
         <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Recovery Rings</span>
-        <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-wide">{JACKSON.today.date}</span>
+        <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-wide">{getTodayKey()}</span>
       </div>
 
       <div className="flex justify-around">
-        <Ring value={score} max={100} color="#22c55e" label="Recovery" unit="%" />
-        <Ring value={sleepHours} max={9} color="#3b82f6" label="Sleep" unit="hr" />
-        <Ring value={strain} max={21} color="#f59e0b" label="Strain" unit="/21" />
+        <Ring value={score ?? 0} max={100} color={score === null ? 'rgba(255,255,255,0.15)' : '#22c55e'} label="Recovery" unit={score !== null ? '%' : '—'} />
+        <Ring value={sleepHours ?? 0} max={9} color={sleepHours === null ? 'rgba(255,255,255,0.15)' : '#22d3ee'} label="Sleep" unit={sleepHours !== null ? 'hr' : '—'} />
+        <Ring value={strain ?? 0} max={21} color={strain === null ? 'rgba(255,255,255,0.15)' : '#a855f7'} label="Strain" unit={strain !== null ? '/21' : '—'} />
       </div>
 
       <div className="grid grid-cols-4 gap-1 mt-5 pt-4 border-t border-white/[0.07]">
         {[
-          { label: 'HRV', value: `${hrv}ms` },
-          { label: 'HR Rest', value: `${restingHR}` },
-          { label: 'Sleep Q', value: `${sleepScore}%` },
+          { label: 'HRV', value: hrv !== null ? `${hrv}ms` : '—' },
+          { label: 'HR Rest', value: restingHR !== null ? `${restingHR}` : '—' },
+          { label: 'Sleep Q', value: sleepQuality !== null ? `${sleepQuality}%` : '—' },
           { label: 'Active', value: activeMin > 0 ? `${activeMin}m` : '—' },
         ].map(({ label, value }) => (
           <div key={label} className="text-center">

@@ -27,9 +27,19 @@ interface RingDef {
   color: RingColor
 }
 
+// Derive a 0-100 sleep quality from logged hours when sleepQuality isn't entered
+function sleepHoursToScore(h: number): number {
+  if (h >= 9) return 100
+  if (h >= 8) return 90
+  if (h >= 7.5) return 82
+  if (h >= 7) return 72
+  if (h >= 6) return 58
+  if (h >= 5) return 40
+  return 25
+}
+
 export default function CommandCenter() {
   const [log, setLog] = useState<DailyLog | null>(null)
-  const [status, setStatus] = useState(() => generateDailyStatus(null, {}))
   const [now, setNow] = useState(new Date())
 
   function refresh() {
@@ -39,7 +49,8 @@ export default function CommandCenter() {
     const voiceLogs = getVoiceLogsToday()
     const projects = getProjects()
     const activity = getDailyActivitySummary()
-    setStatus(generateDailyStatus(todayLog, {
+    // Keep status computed so WhatNeedsAttention / QuickStats stay in sync
+    generateDailyStatus(todayLog, {
       voiceLogsToday: voiceLogs.length,
       stackTaken: stackItems.filter((i) => i.takenToday).length,
       stackTotal: stackItems.length,
@@ -48,70 +59,72 @@ export default function CommandCenter() {
       activityMinutesToday: activity.activeMinutesToday,
       todayActivityLabel: activity.activityLabelToday ?? undefined,
       todayActivityType: activity.activityTypeToday ?? undefined,
-    }))
+    })
   }
 
   useEffect(() => {
     refresh()
     setNow(new Date())
     const timer = setInterval(() => setNow(new Date()), 60_000)
-    window.addEventListener(STORAGE_EVENTS.DAILY_LOG_UPDATED, refresh)
-    window.addEventListener(STORAGE_EVENTS.VOICE_LOG_SAVED, refresh)
-    window.addEventListener(STORAGE_EVENTS.PROJECTS_UPDATED, refresh)
-    window.addEventListener(STORAGE_EVENTS.ACTIVITY_LOG_UPDATED, refresh)
-    window.addEventListener(STORAGE_EVENTS.STACK_UPDATED, refresh)
+    const events = [
+      STORAGE_EVENTS.DAILY_LOG_UPDATED,
+      STORAGE_EVENTS.VOICE_LOG_SAVED,
+      STORAGE_EVENTS.PROJECTS_UPDATED,
+      STORAGE_EVENTS.ACTIVITY_LOG_UPDATED,
+      STORAGE_EVENTS.STACK_UPDATED,
+    ]
+    events.forEach((e) => window.addEventListener(e, refresh))
     return () => {
       clearInterval(timer)
-      window.removeEventListener(STORAGE_EVENTS.DAILY_LOG_UPDATED, refresh)
-      window.removeEventListener(STORAGE_EVENTS.VOICE_LOG_SAVED, refresh)
-      window.removeEventListener(STORAGE_EVENTS.PROJECTS_UPDATED, refresh)
-      window.removeEventListener(STORAGE_EVENTS.ACTIVITY_LOG_UPDATED, refresh)
-      window.removeEventListener(STORAGE_EVENTS.STACK_UPDATED, refresh)
+      events.forEach((e) => window.removeEventListener(e, refresh))
     }
   }, [])
 
-  // Suppress unused warning
-  void status
+  // Recovery data from today's log (null = not logged)
+  const recScore = log?.recoveryScore ?? null
+  const hrv = log?.hrv ?? null
+  const sleepHours = log?.sleepHours ?? null
+  const sleepQuality = log?.sleepQuality ?? (sleepHours !== null ? sleepHoursToScore(sleepHours) : null)
+  const strain = log?.strain ?? null
+  const strainPct = strain !== null ? Math.min(100, Math.round((strain / 21) * 100)) : 0
 
-  const r = JACKSON.today.recovery
-  const n = JACKSON.today.nutrition
-  const calories = log?.calories ?? n.calories.consumed
-  const protein = log?.protein ?? n.protein.consumed
-  const proteinTarget = log?.proteinTarget ?? n.protein.target
-  const nutritionPct = Math.min(100, Math.round((protein / proteinTarget) * 100))
-  const strainPct = Math.min(100, Math.round((r.strain / 21) * 100))
+  // Nutrition from log
+  const proteinConsumed = log?.protein ?? 0
+  const proteinTarget = log?.proteinTarget ?? 180
+  const caloriesConsumed = log?.calories ?? 0
+  const nutritionPct = proteinTarget > 0 ? Math.min(100, Math.round((proteinConsumed / proteinTarget) * 100)) : 0
 
   const rings: RingDef[] = [
     {
       label: 'RECOVERY',
-      value: r.score,
-      displayLabel: `${r.score}`,
-      sub: 'Optimal',
-      subColor: 'text-cyan-400',
+      value: recScore ?? 0,
+      displayLabel: recScore !== null ? `${recScore}` : '—',
+      sub: recScore === null ? 'Log it' : recScore >= 70 ? 'Adapted' : recScore >= 50 ? 'Partial' : 'Strained',
+      subColor: recScore === null ? 'text-zinc-600' : recScore >= 70 ? 'text-cyan-400' : recScore >= 50 ? 'text-purple-400' : 'text-pink-400',
       color: 'pink',
     },
     {
       label: 'SLEEP',
-      value: r.sleepScore,
-      displayLabel: `${r.sleepScore}`,
-      sub: 'Good',
-      subColor: 'text-cyan-400',
+      value: sleepQuality ?? 0,
+      displayLabel: sleepQuality !== null ? `${sleepQuality}` : '—',
+      sub: sleepQuality === null ? 'Log it' : sleepQuality >= 80 ? 'Good' : sleepQuality >= 60 ? 'Fair' : 'Poor',
+      subColor: sleepQuality === null ? 'text-zinc-600' : sleepQuality >= 80 ? 'text-cyan-400' : 'text-purple-400',
       color: 'cyan',
     },
     {
       label: 'STRAIN',
       value: strainPct,
-      displayLabel: `${r.strain}`,
-      sub: 'Moderate',
-      subColor: 'text-pink-400',
+      displayLabel: strain !== null ? `${strain}` : '—',
+      sub: strain === null ? 'Log it' : strain >= 14 ? 'High' : strain >= 7 ? 'Moderate' : 'Low',
+      subColor: strain === null ? 'text-zinc-600' : strain >= 14 ? 'text-pink-400' : 'text-purple-400',
       color: 'pink',
     },
     {
       label: 'NUTRITION',
       value: nutritionPct,
       displayLabel: `${nutritionPct}%`,
-      sub: nutritionPct >= 85 ? 'Excellent' : 'On Track',
-      subColor: 'text-cyan-400',
+      sub: nutritionPct >= 85 ? 'On Target' : nutritionPct > 0 ? 'Tracking' : 'Log it',
+      subColor: nutritionPct >= 85 ? 'text-cyan-400' : nutritionPct > 0 ? 'text-purple-400' : 'text-zinc-600',
       color: 'cyan',
     },
   ]
@@ -137,7 +150,9 @@ export default function CommandCenter() {
         <div className="grid grid-cols-3 gap-3 pt-4 border-t border-white/[0.05]">
           <div>
             <p className="text-[8px] font-mono uppercase tracking-wider text-zinc-600 mb-1">Calories</p>
-            <p className="text-sm font-mono font-bold text-white">{calories.toLocaleString()}</p>
+            <p className="text-sm font-mono font-bold text-white">
+              {caloriesConsumed > 0 ? caloriesConsumed.toLocaleString() : '—'}
+            </p>
             <p className="text-[8px] text-zinc-700 font-mono mt-0.5">kcal</p>
           </div>
           <div>
@@ -149,8 +164,8 @@ export default function CommandCenter() {
           </div>
           <div>
             <p className="text-[8px] font-mono uppercase tracking-wider text-zinc-600 mb-1">HRV</p>
-            <p className="text-sm font-mono font-bold text-white">{r.hrv}</p>
-            <p className="text-[8px] text-zinc-700 font-mono mt-0.5">ms ❤</p>
+            <p className="text-sm font-mono font-bold text-white">{hrv ?? '—'}</p>
+            <p className="text-[8px] text-zinc-700 font-mono mt-0.5">ms</p>
           </div>
         </div>
       </div>

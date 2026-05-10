@@ -2,49 +2,48 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import {
-  getTodayLog,
-  getStorage,
-  getVoiceLogsToday,
-  getUploadsToday,
-  STORAGE_EVENTS,
-  STORAGE_KEYS,
-} from '@/lib/storage'
-import { generateXodusOutput } from '@/lib/xodus-message'
-import type { XodusOutput } from '@/lib/xodus-message'
-import type { StackItem, UploadedFile, UrgencyLevel } from '@/lib/mock-data'
-import { JACKSON } from '@/lib/mock-data'
-import { getProjects, getOverdueCount } from '@/lib/projects'
-import { getThisWeekLogs } from '@/lib/fitness'
+import { STORAGE_EVENTS } from '@/lib/storage'
+import { gatherBrainInput, runXodusBrain } from '@/lib/xodus/brain'
+import type { XodusBrainOutput } from '@/lib/xodus/brain'
 import CommandInbox from '@/components/xodus/CommandInbox'
 
-const URGENCY_STYLE: Record<UrgencyLevel, { pill: string; dot: string; accent: string }> = {
-  LOW:      { pill: 'text-cyan-400 bg-cyan-400/10 border-cyan-400/20',       dot: 'bg-cyan-400',   accent: 'rgba(34,211,238,0.06)'  },
-  MODERATE: { pill: 'text-purple-400 bg-purple-400/10 border-purple-400/20', dot: 'bg-purple-400', accent: 'rgba(168,85,247,0.055)' },
-  HIGH:     { pill: 'text-pink-400 bg-pink-400/10 border-pink-400/20',       dot: 'bg-pink-400',   accent: 'rgba(236,72,153,0.07)'  },
-  CRITICAL: { pill: 'text-pink-300 bg-pink-500/15 border-pink-500/30',       dot: 'bg-pink-400',   accent: 'rgba(236,72,153,0.10)'  },
+const URGENCY_COLOR = {
+  LOW:      { pill: 'text-cyan-400 bg-cyan-400/10 border-cyan-400/20',      dot: 'bg-cyan-400'   },
+  MODERATE: { pill: 'text-purple-400 bg-purple-400/10 border-purple-400/20', dot: 'bg-purple-400' },
+  HIGH:     { pill: 'text-pink-400 bg-pink-400/10 border-pink-400/20',       dot: 'bg-pink-400'   },
+  CRITICAL: { pill: 'text-pink-300 bg-pink-500/15 border-pink-500/30',       dot: 'bg-pink-400 shadow-[0_0_6px_rgba(236,72,153,0.6)]' },
 }
 
-function buildExtras() {
-  const voiceLogs = getVoiceLogsToday()
-  const uploads = getUploadsToday<UploadedFile>()
-  const stackItems = getStorage<StackItem[]>(STORAGE_KEYS.STACK_STATE, JACKSON.stack)
-  const projects = getProjects()
-  const weekLogs = getThisWeekLogs()
-
-  return {
-    voiceLogsToday: voiceLogs.length,
-    uploadsToday: uploads.length,
-    stackTaken: stackItems.filter((i) => i.takenToday).length,
-    stackTotal: stackItems.length,
-    overdueProjects: getOverdueCount(projects),
-    weeklyWorkouts: weekLogs.filter((l) => l.type === 'strength').length,
-  }
+function DomainCard({
+  label, text, accent = 'text-zinc-400',
+}: {
+  label: string
+  text: string
+  accent?: string
+}) {
+  return (
+    <div className="rounded-xl bg-[--surface-raised] border border-white/[0.05] px-4 py-3">
+      <p className="text-[8px] font-mono uppercase tracking-[0.14em] text-zinc-700 mb-1">{label}</p>
+      <p className={`text-[12px] leading-relaxed ${accent}`}>{text}</p>
+    </div>
+  )
 }
 
-function DailyBriefPanel({ output }: { output: XodusOutput }) {
-  const { paragraphs, urgency, executionScore, recoveryState, focusRecommendation, loggedToday } = output
-  const style = URGENCY_STYLE[urgency]
+function DailyBriefPanel({ brain }: { brain: XodusBrainOutput }) {
+  const { executionScore, urgency, brief, nextAction, recovery, nutrition, fitness, projects, stack, loggedToday } = brain
+  const style = URGENCY_COLOR[urgency]
+
+  const recoveryAccent = recovery.state === 'ADAPTED'
+    ? 'text-cyan-300'
+    : recovery.state === 'STRAINED'
+    ? 'text-pink-300'
+    : 'text-zinc-400'
+
+  const nutritionAccent = nutrition.proteinGap !== null && nutrition.proteinGap <= 0
+    ? 'text-cyan-300'
+    : nutrition.calorieStatus === 'under'
+    ? 'text-pink-300'
+    : 'text-zinc-400'
 
   return (
     <div className="space-y-3">
@@ -54,9 +53,13 @@ function DailyBriefPanel({ output }: { output: XodusOutput }) {
           <span className={`w-1 h-1 rounded-full ${style.dot}`} />
           {urgency}
         </span>
-        <span className="text-[10px] font-mono text-zinc-600">Score <span className="text-white font-semibold">{executionScore}/100</span></span>
+        <span className="text-[10px] font-mono text-zinc-600">
+          Score <span className="text-white font-semibold">{executionScore}/100</span>
+        </span>
         <span className="text-zinc-700 text-[10px]">·</span>
-        <span className="text-[10px] font-mono text-zinc-600">Recovery <span className="text-cyan-400 font-semibold">{recoveryState}</span></span>
+        <span className="text-[10px] font-mono text-zinc-600">
+          Recovery <span className={`font-semibold ${recoveryAccent}`}>{recovery.state}</span>
+        </span>
       </div>
 
       {/* Brief card */}
@@ -65,7 +68,7 @@ function DailyBriefPanel({ output }: { output: XodusOutput }) {
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-pink-400 shadow-[0_0_6px_rgba(236,72,153,0.6)]" />
             <span className="text-[10px] font-mono uppercase tracking-[0.14em] text-pink-400/80">
-              Daily Brief · {JACKSON.today.date}
+              Daily Brief
             </span>
           </div>
           {!loggedToday && (
@@ -73,14 +76,12 @@ function DailyBriefPanel({ output }: { output: XodusOutput }) {
           )}
         </div>
 
-        <div className="px-5 py-5 space-y-3.5">
-          {paragraphs.map((para, i) => (
+        <div className="px-5 py-4 space-y-2.5">
+          {brief.map((para, i) => (
             <p
               key={i}
               className={`leading-relaxed ${
-                i === paragraphs.length - 1
-                  ? 'text-white font-medium text-[13px]'
-                  : 'text-zinc-400 text-[13px]'
+                i === 0 ? 'text-white text-[13px] font-medium' : 'text-zinc-400 text-[13px]'
               }`}
             >
               {para}
@@ -88,11 +89,24 @@ function DailyBriefPanel({ output }: { output: XodusOutput }) {
           ))}
         </div>
 
-        {focusRecommendation && (
-          <div className="px-5 py-3.5 border-t border-white/[0.05] bg-white/[0.015]">
-            <p className="text-[9px] font-mono uppercase tracking-[0.14em] text-zinc-700 mb-1.5">Focus</p>
-            <p className="text-[12px] text-zinc-300">{focusRecommendation}</p>
-          </div>
+        {/* Next action */}
+        <div className="px-5 py-3.5 border-t border-white/[0.05] bg-white/[0.015]">
+          <p className="text-[8px] font-mono uppercase tracking-[0.14em] text-zinc-700 mb-1.5">Next Action</p>
+          <Link href={nextAction.href} className="text-[12px] text-cyan-300 hover:text-cyan-200 transition-colors">
+            → {nextAction.text}
+          </Link>
+        </div>
+      </div>
+
+      {/* Domain cards */}
+      <div className="space-y-2">
+        <DomainCard label="Recovery" text={recovery.recommendation} accent={recoveryAccent} />
+        <DomainCard label="Nutrition" text={nutrition.recommendation} accent={nutritionAccent} />
+        <DomainCard label="Fitness" text={fitness.recommendation} />
+        <DomainCard label="Projects" text={projects.recommendation} />
+        {stack.totalCount > 0 && (
+          <DomainCard label="Stack" text={stack.recommendation}
+            accent={stack.completionPct === 100 ? 'text-cyan-300' : 'text-zinc-400'} />
         )}
       </div>
 
@@ -108,26 +122,28 @@ function DailyBriefPanel({ output }: { output: XodusOutput }) {
 }
 
 export default function XodusPage() {
-  const [output, setOutput] = useState<XodusOutput>(() => generateXodusOutput(null))
+  const [brain, setBrain] = useState<XodusBrainOutput>(() =>
+    runXodusBrain(gatherBrainInput())
+  )
 
   function refresh() {
-    const log = getTodayLog()
-    setOutput(generateXodusOutput(log, buildExtras()))
+    setBrain(runXodusBrain(gatherBrainInput()))
   }
 
   useEffect(() => {
     refresh()
-    window.addEventListener(STORAGE_EVENTS.DAILY_LOG_UPDATED, refresh)
-    window.addEventListener(STORAGE_EVENTS.VOICE_LOG_SAVED, refresh)
-    window.addEventListener(STORAGE_EVENTS.PROJECTS_UPDATED, refresh)
-    return () => {
-      window.removeEventListener(STORAGE_EVENTS.DAILY_LOG_UPDATED, refresh)
-      window.removeEventListener(STORAGE_EVENTS.VOICE_LOG_SAVED, refresh)
-      window.removeEventListener(STORAGE_EVENTS.PROJECTS_UPDATED, refresh)
-    }
+    const events = [
+      STORAGE_EVENTS.DAILY_LOG_UPDATED,
+      STORAGE_EVENTS.VOICE_LOG_SAVED,
+      STORAGE_EVENTS.PROJECTS_UPDATED,
+      STORAGE_EVENTS.ACTIVITY_LOG_UPDATED,
+      STORAGE_EVENTS.STACK_UPDATED,
+    ]
+    events.forEach((e) => window.addEventListener(e, refresh))
+    return () => events.forEach((e) => window.removeEventListener(e, refresh))
   }, [])
 
-  const style = URGENCY_STYLE[output.urgency]
+  const style = URGENCY_COLOR[brain.urgency]
 
   return (
     <div className="pb-8">
@@ -142,7 +158,7 @@ export default function XodusPage() {
         <div className="relative flex items-end justify-between">
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <div className={`w-1.5 h-1.5 rounded-full ${style.dot} shadow-[0_0_8px_currentColor]`} />
+              <div className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
               <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-600">
                 Command Inbox
               </span>
@@ -159,14 +175,14 @@ export default function XodusPage() {
 
       {/* Body */}
       <div className="px-4 lg:px-6 lg:grid lg:grid-cols-[1fr_320px] lg:gap-5 pt-4">
-        {/* Left: Command Inbox (primary) */}
+        {/* Left: Command Inbox */}
         <div>
           <CommandInbox />
         </div>
 
-        {/* Right: Daily Brief (context) */}
+        {/* Right: Daily Brief */}
         <div className="mt-5 lg:mt-0">
-          <DailyBriefPanel output={output} />
+          <DailyBriefPanel brain={brain} />
         </div>
       </div>
     </div>
