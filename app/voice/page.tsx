@@ -34,7 +34,7 @@ export default function VoicePage() {
       <div className="relative px-5 pt-10 pb-7 lg:px-10 border-b border-white/[0.05] overflow-hidden">
         <div
           className="absolute inset-0 pointer-events-none"
-          style={{ background: 'radial-gradient(ellipse at 15% 0%, rgba(239,68,68,0.05) 0%, transparent 55%)' }}
+          style={{ background: 'radial-gradient(ellipse at 15% 0%, rgba(236,72,153,0.07) 0%, rgba(34,211,238,0.03) 50%, transparent 70%)' }}
         />
         <div className="relative">
           <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-600 mb-2">Capture</p>

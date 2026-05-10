@@ -1017,7 +1017,7 @@ export default function CommandInbox() {
               <button
                 onClick={handleSaveAll}
                 disabled={pendingApprovedCount === 0}
-                className="flex items-center gap-1.5 px-3 h-8 rounded-lg text-[12px] font-semibold bg-white text-zinc-950 hover:bg-zinc-100 disabled:opacity-20 disabled:cursor-not-allowed transition-all"
+                className="flex items-center gap-1.5 px-3 h-8 rounded-lg text-[12px] font-semibold bg-gradient-to-r from-pink-500 to-cyan-400 text-white hover:opacity-90 disabled:opacity-20 disabled:cursor-not-allowed transition-all"
               >
                 <Check size={12} />
                 Save {pendingApprovedCount > 0 ? pendingApprovedCount : ''}
@@ -1027,7 +1027,7 @@ export default function CommandInbox() {
             <button
               onClick={handleAnalyze}
               disabled={(!input.trim() && images.length === 0) || phase === 'saved'}
-              className="flex items-center gap-1.5 px-3 h-8 rounded-lg text-[12px] font-semibold bg-white text-zinc-950 hover:bg-zinc-100 disabled:opacity-20 disabled:cursor-not-allowed transition-all"
+              className="flex items-center gap-1.5 px-3 h-8 rounded-lg text-[12px] font-semibold bg-gradient-to-r from-pink-500 to-cyan-400 text-white hover:opacity-90 disabled:opacity-20 disabled:cursor-not-allowed transition-all"
             >
               <Send size={12} />
               Analyze

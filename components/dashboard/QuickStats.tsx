@@ -2,142 +2,124 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { getTodayLog, STORAGE_EVENTS } from '@/lib/storage'
+import {
+  getTodayLog,
+  getStorage,
+  getVoiceLogsToday,
+  STORAGE_EVENTS,
+  STORAGE_KEYS,
+} from '@/lib/storage'
 import type { DailyLog } from '@/lib/storage'
+import { generateDailyStatus } from '@/lib/daily-status'
+import { getProjects, getOverdueCount } from '@/lib/projects'
+import type { StackItem } from '@/lib/mock-data'
 import { JACKSON } from '@/lib/mock-data'
-import { getDailyActivitySummary } from '@/lib/activity-summary'
-import type { DailyActivitySummary } from '@/lib/activity-summary'
 
-type StatRowProps = {
-  label: string
-  value: string
-  sub?: string
-  pct?: number
-  barColor?: string
-  warn?: boolean
-  good?: boolean
-}
-
-function StatRow({ label, value, sub, pct, barColor = '#3b82f6', warn, good }: StatRowProps) {
+function ScoreBar({ pct, id }: { pct: number; id: string }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.04] last:border-0">
-      <span className="text-[9px] font-mono uppercase tracking-wider text-zinc-600 w-20 flex-shrink-0">
-        {label}
-      </span>
-      <div className="flex-1 flex items-center gap-2 min-w-0">
-        {pct !== undefined && (
-          <div className="flex-1 h-0.5 bg-white/[0.07] rounded-full overflow-hidden min-w-0">
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{ width: `${Math.min(pct, 100)}%`, background: barColor }}
-            />
-          </div>
-        )}
-      </div>
-      <div className="flex items-center gap-2 flex-shrink-0">
-        {sub && (
-          <span className={`text-[9px] font-mono ${warn ? 'text-amber-400' : good ? 'text-green-400' : 'text-zinc-600'}`}>
-            {sub}
-          </span>
-        )}
-        <span className={`text-sm font-mono font-semibold tabular-nums ${warn ? 'text-amber-300' : good ? 'text-green-300' : 'text-white'}`}>
-          {value}
-        </span>
-      </div>
+    <div className="h-1.5 bg-white/[0.07] rounded-full overflow-hidden w-full">
+      <div
+        className="h-full rounded-full transition-all duration-700"
+        style={{
+          width: `${Math.min(pct, 100)}%`,
+          background: `linear-gradient(to right, #22d3ee, #f472b6)`,
+        }}
+      />
     </div>
   )
 }
 
 export default function QuickStats() {
   const [log, setLog] = useState<DailyLog | null>(null)
-  const [activity, setActivity] = useState<DailyActivitySummary>(() => getDailyActivitySummary())
+  const [status, setStatus] = useState(() => generateDailyStatus(null, {}))
 
   function refresh() {
-    setLog(getTodayLog())
-    setActivity(getDailyActivitySummary())
+    const todayLog = getTodayLog()
+    setLog(todayLog)
+    const stackItems = getStorage<StackItem[]>(STORAGE_KEYS.STACK_STATE, JACKSON.stack)
+    const voiceLogs = getVoiceLogsToday()
+    const projects = getProjects()
+    setStatus(generateDailyStatus(todayLog, {
+      voiceLogsToday: voiceLogs.length,
+      stackTaken: stackItems.filter((i) => i.takenToday).length,
+      stackTotal: stackItems.length,
+      overdueProjects: getOverdueCount(projects),
+    }))
   }
 
   useEffect(() => {
     refresh()
     window.addEventListener(STORAGE_EVENTS.DAILY_LOG_UPDATED, refresh)
     window.addEventListener(STORAGE_EVENTS.ACTIVITY_LOG_UPDATED, refresh)
+    window.addEventListener(STORAGE_EVENTS.STACK_UPDATED, refresh)
+    window.addEventListener(STORAGE_EVENTS.VOICE_LOG_SAVED, refresh)
+    window.addEventListener(STORAGE_EVENTS.PROJECTS_UPDATED, refresh)
     return () => {
       window.removeEventListener(STORAGE_EVENTS.DAILY_LOG_UPDATED, refresh)
       window.removeEventListener(STORAGE_EVENTS.ACTIVITY_LOG_UPDATED, refresh)
+      window.removeEventListener(STORAGE_EVENTS.STACK_UPDATED, refresh)
+      window.removeEventListener(STORAGE_EVENTS.VOICE_LOG_SAVED, refresh)
+      window.removeEventListener(STORAGE_EVENTS.PROJECTS_UPDATED, refresh)
     }
   }, [])
 
-  const mock = JACKSON.today
-  const proteinConsumed = log?.protein ?? mock.nutrition.protein.consumed
-  const proteinTarget   = log?.proteinTarget ?? mock.nutrition.protein.target
-  const calConsumed     = log?.calories ?? mock.nutrition.calories.consumed
-  const calTarget       = log?.calorieTarget ?? mock.nutrition.calories.target
-  const screenTotal     = log?.screenTime ?? mock.screenTime.total
-  const screenTarget    = mock.screenTime.target
-  const screenIG        = log?.instagramTime ?? mock.screenTime.instagram
-  const drank           = log?.drankToday ?? false
-  const noDrink         = mock.streaks.noDrinking
-  const fromLog         = log !== null
-  const activeMin       = activity.activeMinutesToday
+  const { executionScore, disciplineLevel } = status
+  const mentalScore = log?.confidenceScore ?? JACKSON.today.confidence
+  const mentalLabel = mentalScore >= 8 ? 'Excellent' : mentalScore >= 6 ? 'Calm' : mentalScore >= 4 ? 'Neutral' : 'Low'
 
-  const proteinPct = Math.round((proteinConsumed / proteinTarget) * 100)
-  const calPct     = Math.round((calConsumed / calTarget) * 100)
-  const screenOver = screenTotal > screenTarget
+  const protein = log?.protein ?? JACKSON.today.nutrition.protein.consumed
+  const proteinTarget = log?.proteinTarget ?? JACKSON.today.nutrition.protein.target
+  const proteinPct = Math.round((protein / proteinTarget) * 100)
+
+  const calories = log?.calories ?? JACKSON.today.nutrition.calories.consumed
+  const calTarget = log?.calorieTarget ?? JACKSON.today.nutrition.calories.target
+  const calPct = Math.round((calories / calTarget) * 100)
 
   return (
-    <div className="mx-4 mt-3">
-      <div className="flex items-center justify-between mb-2.5">
-        <span className="text-[9px] font-mono uppercase tracking-[0.12em] text-zinc-700">Metrics</span>
-        <Link href="/daily" className="text-[9px] font-mono text-blue-400 hover:text-blue-300 transition-colors">
-          {fromLog ? 'Update →' : 'Log today →'}
-        </Link>
+    <div className="space-y-3">
+      {/* Discipline Score */}
+      <div className="rounded-2xl bg-[#181818] border border-white/[0.06] p-4">
+        <div className="flex items-baseline justify-between mb-2">
+          <p className="text-[9px] font-mono uppercase tracking-[0.16em] text-zinc-500">Discipline Score</p>
+          <span className="text-2xl font-bold text-white font-display">{executionScore}</span>
+        </div>
+        <p className="text-[9px] font-mono text-cyan-400 mb-2">{disciplineLevel.replace('_', ' ')}</p>
+        <ScoreBar pct={executionScore} id="discipline" />
       </div>
-      <div className="rounded-xl bg-[#0f0f0f] border border-white/[0.06] overflow-hidden">
-        <StatRow
-          label="Protein"
-          value={`${proteinConsumed}g`}
-          sub={`${proteinPct}% of ${proteinTarget}g`}
-          pct={proteinPct}
-          barColor="#3b82f6"
-          good={proteinPct >= 80}
-          warn={proteinPct < 60}
-        />
-        <StatRow
-          label="Calories"
-          value={calConsumed.toLocaleString()}
-          sub={`of ${calTarget.toLocaleString()}`}
-          pct={calPct}
-          barColor="#22c55e"
-        />
-        <StatRow
-          label="Screen"
-          value={`${screenTotal}h`}
-          sub={screenOver ? `+${(screenTotal - screenTarget).toFixed(1)}h over · IG ${screenIG}h` : `${(screenTarget - screenTotal).toFixed(1)}h left`}
-          warn={screenOver}
-          good={!screenOver && screenTotal > 0}
-        />
-        <StatRow
-          label={drank ? 'Alcohol' : 'No Alcohol'}
-          value={drank ? '—' : `${noDrink}d`}
-          sub={drank ? 'Streak reset' : 'streak'}
-          warn={drank}
-          good={!drank && noDrink > 0}
-        />
-        <StatRow
-          label="Active"
-          value={activeMin > 0 ? `${activeMin}m` : '—'}
-          sub={activeMin >= 30 ? 'goal hit' : activeMin > 0 ? `${30 - activeMin}m to go` : 'none today'}
-          pct={activeMin > 0 ? Math.min(100, Math.round((activeMin / 30) * 100)) : undefined}
-          barColor="#f59e0b"
-          good={activeMin >= 30}
-          warn={activeMin > 0 && activeMin < 20}
-        />
+
+      {/* Mental Score */}
+      <div className="rounded-2xl bg-[#181818] border border-white/[0.06] p-4">
+        <div className="flex items-baseline justify-between mb-2">
+          <p className="text-[9px] font-mono uppercase tracking-[0.16em] text-zinc-500">Mental Score</p>
+          <span className="text-2xl font-bold text-white font-display">{Math.round(mentalScore * 10)}</span>
+        </div>
+        <p className="text-[9px] font-mono text-pink-400 mb-2">{mentalLabel}</p>
+        <ScoreBar pct={mentalScore * 10} id="mental" />
       </div>
-      {!fromLog && (
-        <p className="text-[9px] font-mono text-zinc-700 mt-2 text-center">
-          estimated · <Link href="/daily" className="text-blue-500/80 hover:text-blue-400">log today</Link> for live metrics
-        </p>
-      )}
+
+      {/* Nutrition quick view */}
+      <div className="rounded-2xl bg-[#181818] border border-white/[0.06] p-4">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[9px] font-mono uppercase tracking-[0.16em] text-zinc-500">Nutrition</p>
+          <Link href="/daily" className="text-[9px] font-mono text-zinc-600 hover:text-zinc-400">Update →</Link>
+        </div>
+        <div className="space-y-2.5">
+          <div>
+            <div className="flex justify-between mb-1">
+              <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-wider">Protein</span>
+              <span className="text-[10px] font-mono text-white">{protein}g <span className="text-zinc-600">/ {proteinTarget}g</span></span>
+            </div>
+            <ScoreBar pct={proteinPct} id="protein" />
+          </div>
+          <div>
+            <div className="flex justify-between mb-1">
+              <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-wider">Calories</span>
+              <span className="text-[10px] font-mono text-white">{calories.toLocaleString()} <span className="text-zinc-600">/ {calTarget.toLocaleString()}</span></span>
+            </div>
+            <ScoreBar pct={calPct} id="calories" />
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

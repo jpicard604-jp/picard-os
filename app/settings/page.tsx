@@ -246,7 +246,7 @@ export default function SettingsPage() {
       <div className="relative px-5 pt-10 pb-7 lg:px-10 border-b border-white/[0.05] overflow-hidden">
         <div
           className="absolute inset-0 pointer-events-none"
-          style={{ background: 'radial-gradient(ellipse at 15% 0%, rgba(99,102,241,0.04) 0%, transparent 60%)' }}
+          style={{ background: 'radial-gradient(ellipse at 15% 0%, rgba(236,72,153,0.07) 0%, rgba(34,211,238,0.02) 50%, transparent 70%)' }}
         />
         <div className="relative">
           <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-600 mb-2">Configuration</p>
@@ -272,7 +272,7 @@ export default function SettingsPage() {
               </div>
               <button
                 onClick={handleExport}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-zinc-950 text-[13px] font-semibold hover:bg-zinc-100 active:scale-[0.98] transition-all flex-shrink-0"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-cyan-400 text-white text-[13px] font-semibold hover:opacity-90 active:scale-[0.98] transition-all flex-shrink-0"
               >
                 <Download size={14} strokeWidth={2.5} />
                 Export
@@ -313,7 +313,7 @@ export default function SettingsPage() {
               </div>
               <button
                 onClick={handleObsidianExport}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-500/[0.08] border border-violet-500/20 text-violet-300 text-[13px] font-medium hover:bg-violet-500/[0.14] active:scale-[0.98] transition-all flex-shrink-0"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-500/[0.08] border border-cyan-500/20 text-cyan-300 text-[13px] font-medium hover:bg-cyan-500/[0.14] active:scale-[0.98] transition-all flex-shrink-0"
               >
                 <FileText size={14} strokeWidth={2} />
                 Export .md

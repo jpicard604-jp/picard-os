@@ -58,18 +58,18 @@ export default function Sidebar() {
               href={href}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all duration-150 group ${
                 active
-                  ? 'bg-white/[0.06] text-white'
-                  : 'text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.035]'
+                  ? 'bg-pink-500/[0.16] border border-pink-500/25 text-white'
+                  : 'text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.035] border border-transparent'
               }`}
             >
               <Icon
                 size={15}
                 strokeWidth={active ? 2 : 1.75}
-                className={active ? 'text-sky-400' : 'text-zinc-600 group-hover:text-zinc-400 transition-colors'}
+                className={active ? 'text-pink-400' : 'text-zinc-600 group-hover:text-zinc-400 transition-colors'}
               />
               {label}
               {active && (
-                <span className="ml-auto w-1 h-1 rounded-full bg-sky-400/60" />
+                <span className="ml-auto w-1 h-1 rounded-full bg-pink-400/70" />
               )}
             </Link>
           )
@@ -87,14 +87,14 @@ export default function Sidebar() {
               href={href}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all duration-150 group ${
                 active
-                  ? 'bg-white/[0.06] text-white'
-                  : 'text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.035]'
+                  ? 'bg-pink-500/[0.16] border border-pink-500/25 text-white'
+                  : 'text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.035] border border-transparent'
               }`}
             >
               <Icon
                 size={15}
                 strokeWidth={active ? 2 : 1.75}
-                className={active ? 'text-sky-400' : 'text-zinc-600 group-hover:text-zinc-400 transition-colors'}
+                className={active ? 'text-pink-400' : 'text-zinc-600 group-hover:text-zinc-400 transition-colors'}
               />
               {label}
             </Link>

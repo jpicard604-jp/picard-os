@@ -32,10 +32,8 @@ function ProjectRow({ project }: { project: Project }) {
       <div className="flex items-center gap-2.5 flex-shrink-0">
         <div className="w-14 h-0.5 bg-white/[0.08] rounded-full overflow-hidden">
           <div
-            className={`h-full rounded-full transition-all duration-500 ${
-              pct >= 80 ? 'bg-green-500' : pct >= 50 ? 'bg-blue-500' : 'bg-zinc-500'
-            }`}
-            style={{ width: `${pct}%` }}
+            className="h-full rounded-full transition-all duration-500"
+            style={{ width: `${pct}%`, background: 'linear-gradient(to right, #22d3ee, #ec4899)' }}
           />
         </div>
         <span className="text-[9px] font-mono text-zinc-600 w-7 text-right">{pct}%</span>
@@ -59,14 +57,14 @@ export default function ProjectSummary() {
   }, [])
 
   return (
-    <div className="mx-4 mt-3">
+    <div>
       <div className="flex items-center justify-between mb-2.5">
-        <span className="text-[9px] font-mono uppercase tracking-[0.12em] text-zinc-700">Projects</span>
-        <Link href="/projects" className="text-[9px] font-mono text-blue-400 hover:text-blue-300 transition-colors">
+        <span className="text-[9px] font-mono uppercase tracking-[0.12em] text-zinc-600">Projects</span>
+        <Link href="/projects" className="text-[9px] font-mono text-pink-400 hover:text-pink-300 transition-colors">
           All →
         </Link>
       </div>
-      <div className="rounded-xl bg-[#0f0f0f] border border-white/[0.06] overflow-hidden">
+      <div className="rounded-2xl bg-[#181818] border border-white/[0.06] overflow-hidden">
         {projects.length > 0 ? (
           projects.map((p) => <ProjectRow key={p.id} project={p} />)
         ) : (

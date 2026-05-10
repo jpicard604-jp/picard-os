@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Sora } from 'next/font/google'
 import './globals.css'
 import BottomNav from '@/components/BottomNav'
 import Sidebar from '@/components/Sidebar'
+import TopBar from '@/components/layout/TopBar'
 import ServiceWorkerRegistration from '@/components/ServiceWorkerRegistration'
 
 const geistSans = Geist({
@@ -41,11 +42,12 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${sora.variable} h-full antialiased`}>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${sora.variable} h-full antialiased dark`}>
       <body className="h-full bg-background text-foreground font-sans">
         <ServiceWorkerRegistration />
         <Sidebar />
         <div className="h-full lg:pl-60 flex flex-col">
+          <TopBar />
           <main className="flex-1 overflow-y-auto content-area no-scrollbar">
             {children}
           </main>

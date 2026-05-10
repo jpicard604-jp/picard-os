@@ -394,8 +394,8 @@ export default function VoiceCapture() {
                 onClick={startRecording}
                 className="w-full flex items-center gap-4 bg-[--surface-raised] rounded-xl border border-white/[0.09] px-5 py-4 active:scale-[0.98] hover:border-white/[0.14] transition-all duration-150"
               >
-                <div className="w-10 h-10 rounded-full bg-red-500/10 border border-red-500/25 flex items-center justify-center flex-shrink-0">
-                  <Mic size={17} className="text-red-400" />
+                <div className="w-10 h-10 rounded-full bg-pink-500/10 border border-pink-500/25 flex items-center justify-center flex-shrink-0">
+                  <Mic size={17} className="text-pink-400" />
                 </div>
                 <div className="text-left">
                   <p className="text-sm font-medium text-white">Start Recording</p>
@@ -439,7 +439,7 @@ export default function VoiceCapture() {
               <button
                 onClick={saveManualLog}
                 disabled={!manualText.trim()}
-                className="bg-sky-600 hover:bg-sky-500 disabled:opacity-25 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-lg px-4 py-2 transition-colors"
+                className="bg-gradient-to-r from-pink-500 to-cyan-400 text-white text-xs font-semibold rounded-lg px-4 py-2 hover:opacity-90 disabled:opacity-25 disabled:cursor-not-allowed transition-all"
               >
                 Save &amp; Analyze
               </button>
@@ -510,7 +510,7 @@ export default function VoiceCapture() {
               <button
                 onClick={saveLog}
                 disabled={!transcript.trim()}
-                className="bg-sky-600 hover:bg-sky-500 disabled:opacity-25 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-lg px-4 py-2 transition-colors"
+                className="bg-gradient-to-r from-pink-500 to-cyan-400 text-white text-xs font-semibold rounded-lg px-4 py-2 hover:opacity-90 disabled:opacity-25 disabled:cursor-not-allowed transition-all"
               >
                 Save to Log
               </button>
@@ -620,7 +620,7 @@ export default function VoiceCapture() {
                   ) : (
                     <button
                       onClick={saveToDailyLog}
-                      className="flex items-center gap-1.5 bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 text-xs font-semibold rounded-lg px-3 py-1.5 hover:bg-indigo-600/30 transition-colors"
+                      className="flex items-center gap-1.5 bg-pink-500/15 border border-pink-500/30 text-pink-400 text-xs font-semibold rounded-lg px-3 py-1.5 hover:bg-pink-500/25 transition-colors"
                     >
                       <CalendarDays size={11} /> Save to Daily
                     </button>
@@ -634,7 +634,7 @@ export default function VoiceCapture() {
                   ) : (
                     <button
                       onClick={saveAsActivity}
-                      className="flex items-center gap-1.5 bg-sky-600/20 border border-sky-500/30 text-sky-400 text-xs font-semibold rounded-lg px-3 py-1.5 hover:bg-sky-600/30 transition-colors"
+                      className="flex items-center gap-1.5 bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 text-xs font-semibold rounded-lg px-3 py-1.5 hover:bg-cyan-500/25 transition-colors"
                     >
                       <Dumbbell size={11} /> Save Activity
                     </button>

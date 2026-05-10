@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
+import { ScoreRing } from '@/components/ui/score-ring'
 import {
   getTodayLog,
   getStorage,
@@ -9,69 +9,59 @@ import {
   STORAGE_EVENTS,
   STORAGE_KEYS,
 } from '@/lib/storage'
+import type { DailyLog } from '@/lib/storage'
 import { generateDailyStatus } from '@/lib/daily-status'
 import { getProjects, getOverdueCount } from '@/lib/projects'
 import { getDailyActivitySummary } from '@/lib/activity-summary'
 import type { StackItem } from '@/lib/mock-data'
 import { JACKSON } from '@/lib/mock-data'
 
-const URGENCY_PILL = {
-  LOW:      { text: 'text-green-400',  bg: 'bg-green-400/10 border-green-400/20'  },
-  MODERATE: { text: 'text-sky-400',    bg: 'bg-sky-400/10 border-sky-400/20'      },
-  HIGH:     { text: 'text-amber-400',  bg: 'bg-amber-400/10 border-amber-400/20'  },
-  CRITICAL: { text: 'text-red-400',    bg: 'bg-red-400/10 border-red-400/20'      },
-}
+type RingColor = 'pink' | 'cyan'
 
-const SCORE_BAR = {
-  high: 'bg-green-500',
-  mid:  'bg-sky-500',
-  low:  'bg-amber-500',
-  crit: 'bg-red-500',
-}
-
-const RECOVERY_TEXT: Record<string, string> = {
-  ADAPTED:    'text-green-400',
-  RECOVERING: 'text-sky-400',
-  STRAINED:   'text-red-400',
-}
-
-const DISCIPLINE_TEXT: Record<string, string> = {
-  LOCKED_IN:  'text-green-400',
-  CONSISTENT: 'text-sky-400',
-  SLIPPING:   'text-amber-400',
-  OFF:        'text-red-400',
+interface RingDef {
+  label: string
+  value: number
+  displayLabel: string
+  sub: string
+  subColor: string
+  color: RingColor
 }
 
 export default function CommandCenter() {
+  const [log, setLog] = useState<DailyLog | null>(null)
   const [status, setStatus] = useState(() => generateDailyStatus(null, {}))
+  const [now, setNow] = useState(new Date())
 
   function refresh() {
-    const log = getTodayLog()
+    const todayLog = getTodayLog()
+    setLog(todayLog)
     const stackItems = getStorage<StackItem[]>(STORAGE_KEYS.STACK_STATE, JACKSON.stack)
     const voiceLogs = getVoiceLogsToday()
     const projects = getProjects()
-    const activitySummary = getDailyActivitySummary()
-
-    setStatus(generateDailyStatus(log, {
+    const activity = getDailyActivitySummary()
+    setStatus(generateDailyStatus(todayLog, {
       voiceLogsToday: voiceLogs.length,
       stackTaken: stackItems.filter((i) => i.takenToday).length,
       stackTotal: stackItems.length,
       overdueProjects: getOverdueCount(projects),
-      weeklyWorkouts: activitySummary.weeklyWorkouts,
-      activityMinutesToday: activitySummary.activeMinutesToday,
-      todayActivityLabel: activitySummary.activityLabelToday ?? undefined,
-      todayActivityType: activitySummary.activityTypeToday ?? undefined,
+      weeklyWorkouts: activity.weeklyWorkouts,
+      activityMinutesToday: activity.activeMinutesToday,
+      todayActivityLabel: activity.activityLabelToday ?? undefined,
+      todayActivityType: activity.activityTypeToday ?? undefined,
     }))
   }
 
   useEffect(() => {
     refresh()
+    setNow(new Date())
+    const timer = setInterval(() => setNow(new Date()), 60_000)
     window.addEventListener(STORAGE_EVENTS.DAILY_LOG_UPDATED, refresh)
     window.addEventListener(STORAGE_EVENTS.VOICE_LOG_SAVED, refresh)
     window.addEventListener(STORAGE_EVENTS.PROJECTS_UPDATED, refresh)
     window.addEventListener(STORAGE_EVENTS.ACTIVITY_LOG_UPDATED, refresh)
     window.addEventListener(STORAGE_EVENTS.STACK_UPDATED, refresh)
     return () => {
+      clearInterval(timer)
       window.removeEventListener(STORAGE_EVENTS.DAILY_LOG_UPDATED, refresh)
       window.removeEventListener(STORAGE_EVENTS.VOICE_LOG_SAVED, refresh)
       window.removeEventListener(STORAGE_EVENTS.PROJECTS_UPDATED, refresh)
@@ -80,101 +70,110 @@ export default function CommandCenter() {
     }
   }, [])
 
-  const {
-    executionScore, urgencyLevel, recoveryLevel,
-    disciplineLevel, stackCompletion, loggedToday,
-  } = status
+  // Suppress unused warning
+  void status
 
-  const urgencyStyle = URGENCY_PILL[urgencyLevel]
-  const noDrink = JACKSON.today.streaks.noDrinking
-  const hrv = JACKSON.today.recovery.hrv
+  const r = JACKSON.today.recovery
+  const n = JACKSON.today.nutrition
+  const calories = log?.calories ?? n.calories.consumed
+  const protein = log?.protein ?? n.protein.consumed
+  const proteinTarget = log?.proteinTarget ?? n.protein.target
+  const nutritionPct = Math.min(100, Math.round((protein / proteinTarget) * 100))
+  const strainPct = Math.min(100, Math.round((r.strain / 21) * 100))
 
-  const barColor =
-    executionScore >= 75 ? SCORE_BAR.high :
-    executionScore >= 55 ? SCORE_BAR.mid  :
-    executionScore >= 35 ? SCORE_BAR.low  :
-    SCORE_BAR.crit
+  const rings: RingDef[] = [
+    {
+      label: 'RECOVERY',
+      value: r.score,
+      displayLabel: `${r.score}`,
+      sub: 'Optimal',
+      subColor: 'text-cyan-400',
+      color: 'pink',
+    },
+    {
+      label: 'SLEEP',
+      value: r.sleepScore,
+      displayLabel: `${r.sleepScore}`,
+      sub: 'Good',
+      subColor: 'text-cyan-400',
+      color: 'cyan',
+    },
+    {
+      label: 'STRAIN',
+      value: strainPct,
+      displayLabel: `${r.strain}`,
+      sub: 'Moderate',
+      subColor: 'text-pink-400',
+      color: 'pink',
+    },
+    {
+      label: 'NUTRITION',
+      value: nutritionPct,
+      displayLabel: `${nutritionPct}%`,
+      sub: nutritionPct >= 85 ? 'Excellent' : 'On Track',
+      subColor: 'text-cyan-400',
+      color: 'cyan',
+    },
+  ]
 
-  const today = new Date()
-  const dayName = today.toLocaleDateString('en-US', { weekday: 'long' })
-  const monthDay = today.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
+  const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+  const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
   return (
-    <section className="relative px-5 pt-10 pb-7 lg:px-10 lg:pt-12 border-b border-white/[0.05] overflow-hidden">
-      {/* Atmospheric ambient glow */}
-      <div
-        className="absolute top-0 left-0 w-full h-full pointer-events-none"
-        style={{
-          background: 'radial-gradient(ellipse at 20% 0%, rgba(59,130,246,0.05) 0%, transparent 55%)',
-        }}
-      />
-
-      <div className="relative flex items-start justify-between gap-4">
-        {/* Left — score display */}
-        <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-zinc-600 mb-5">
-            {dayName}, {monthDay}
-          </p>
-
-          {/* Score number — Sora display font, pure white, no color coding */}
-          <div className="flex items-end gap-2 mb-4">
-            <span
-              className="font-display font-light text-white leading-none tracking-tight tabular-nums"
-              style={{ fontSize: 'clamp(72px, 10vw, 100px)' }}
-            >
-              {executionScore}
-            </span>
-            <span className="text-xl font-mono text-zinc-700 mb-2.5">/100</span>
+    <div className="grid grid-cols-1 lg:grid-cols-[5fr_7fr] gap-4">
+      {/* Left — Today Overview */}
+      <div className="rounded-2xl bg-[#181818] border border-white/[0.06] p-5">
+        <p className="text-[9px] font-mono uppercase tracking-[0.18em] text-zinc-500 mb-4">Today Overview</p>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-4 mb-5">
+          <div>
+            <p className="text-[8px] font-mono uppercase tracking-wider text-zinc-600 mb-1">Time</p>
+            <p className="text-2xl font-semibold text-white leading-none">{timeStr}</p>
           </div>
-
-          {/* Progress bar — color indicates performance level */}
-          <div className="h-[2px] w-52 lg:w-64 bg-white/[0.06] rounded-full mb-5 overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-700 ${barColor}`}
-              style={{ width: `${Math.max(3, executionScore)}%` }}
-            />
-          </div>
-
-          {/* Status labels */}
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <span
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[9px] font-mono uppercase tracking-wider ${urgencyStyle.bg} ${urgencyStyle.text}`}
-            >
-              <span className="w-1 h-1 rounded-full bg-current" />
-              {urgencyLevel}
-            </span>
-            <span className={`text-[11px] font-mono font-semibold ${RECOVERY_TEXT[recoveryLevel] ?? 'text-zinc-400'}`}>
-              {recoveryLevel}
-            </span>
-            <span className="text-zinc-800">·</span>
-            <span className={`text-[11px] font-mono font-semibold ${DISCIPLINE_TEXT[disciplineLevel] ?? 'text-zinc-400'}`}>
-              {disciplineLevel.replace('_', ' ')}
-            </span>
+          <div>
+            <p className="text-[8px] font-mono uppercase tracking-wider text-zinc-600 mb-1">Date</p>
+            <p className="text-lg font-semibold text-white leading-tight mt-0.5">{dateStr}</p>
           </div>
         </div>
-
-        {/* Right — quick context */}
-        <div className="flex-shrink-0 flex flex-col items-end gap-2 pt-8">
-          {!loggedToday && (
-            <Link
-              href="/daily"
-              className="text-[9px] font-mono text-amber-400/80 bg-amber-500/[0.07] border border-amber-500/20 rounded-full px-3 py-1.5 uppercase tracking-wider hover:bg-amber-500/[0.12] transition-colors mb-1"
-            >
-              Log today
-            </Link>
-          )}
-          <div className="space-y-1.5 text-right">
-            <p className="text-[9px] font-mono text-zinc-600">{noDrink}d alcohol-free</p>
-            <p className="text-[9px] font-mono text-zinc-600">
-              Stack {Math.round(stackCompletion * 100)}%
+        <div className="grid grid-cols-3 gap-3 pt-4 border-t border-white/[0.05]">
+          <div>
+            <p className="text-[8px] font-mono uppercase tracking-wider text-zinc-600 mb-1">Calories</p>
+            <p className="text-sm font-mono font-bold text-white">{calories.toLocaleString()}</p>
+            <p className="text-[8px] text-zinc-700 font-mono mt-0.5">kcal</p>
+          </div>
+          <div>
+            <p className="text-[8px] font-mono uppercase tracking-wider text-zinc-600 mb-1">Steps</p>
+            <p className="text-sm font-mono font-bold text-white">
+              {log?.steps ? log.steps.toLocaleString() : '—'}
             </p>
-            <p className="text-[9px] font-mono text-zinc-600">HRV {hrv}ms</p>
-            <p className={`text-[9px] font-mono ${loggedToday ? 'text-green-500/70' : 'text-zinc-700'}`}>
-              {loggedToday ? '✓ logged' : 'log pending'}
-            </p>
+            <p className="text-[8px] text-zinc-700 font-mono mt-0.5">steps</p>
+          </div>
+          <div>
+            <p className="text-[8px] font-mono uppercase tracking-wider text-zinc-600 mb-1">HRV</p>
+            <p className="text-sm font-mono font-bold text-white">{r.hrv}</p>
+            <p className="text-[8px] text-zinc-700 font-mono mt-0.5">ms ❤</p>
           </div>
         </div>
       </div>
-    </section>
+
+      {/* Right — Score Rings */}
+      <div className="rounded-2xl bg-[#181818] border border-white/[0.06] p-5">
+        <div className="grid grid-cols-4 h-full gap-2">
+          {rings.map(({ label, value, displayLabel, sub, subColor, color }) => (
+            <div key={label} className="flex flex-col items-center gap-2">
+              <p className="text-[7px] font-mono uppercase tracking-[0.14em] text-zinc-500">{label}</p>
+              <ScoreRing
+                value={value}
+                size={88}
+                strokeWidth={11}
+                color={color}
+                label={displayLabel}
+              />
+              <div className="h-0.5 w-12 rounded-full bg-gradient-to-r from-pink-500 to-cyan-400 flex-shrink-0" />
+              <p className={`text-[9px] font-mono leading-none ${subColor}`}>{sub}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   )
 }

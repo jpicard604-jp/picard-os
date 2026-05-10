@@ -36,7 +36,7 @@ function NumInput({
         <label className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">{label}</label>
         {hint && <span className="text-[9px] text-zinc-700 font-mono">{hint}</span>}
       </div>
-      <div className="flex items-center gap-2 bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 focus-within:border-blue-500/30 transition-colors">
+      <div className="flex items-center gap-2 bg-[--surface-raised] border border-white/[0.08] rounded-xl px-4 py-3 focus-within:border-pink-500/30 transition-colors">
         <input
           type="number"
           inputMode={decimal ? 'decimal' : 'numeric'}
@@ -113,11 +113,11 @@ function ConfidencePicker({
             className={`flex-1 py-2.5 rounded-lg text-xs font-mono font-semibold border transition-all duration-150 ${
               value === n
                 ? n >= 8
-                  ? 'bg-green-500/20 border-green-500/40 text-green-400'
+                  ? 'bg-cyan-500/15 border-cyan-500/35 text-cyan-300'
                   : n >= 6
-                  ? 'bg-blue-500/20 border-blue-500/40 text-blue-400'
-                  : 'bg-amber-500/20 border-amber-500/40 text-amber-400'
-                : 'border-white/10 text-zinc-700 bg-transparent'
+                  ? 'bg-pink-500/15 border-pink-500/35 text-pink-300'
+                  : 'bg-amber-500/15 border-amber-500/35 text-amber-300'
+                : 'border-white/[0.08] text-zinc-700 bg-transparent'
             }`}
           >
             {n}
@@ -170,7 +170,7 @@ export default function LogPage() {
       {/* NUTRITION */}
       <div className="mx-4 mb-3">
         <p className="text-[9px] font-mono uppercase tracking-[0.14em] text-zinc-700 mb-2 px-1">Nutrition</p>
-        <div className="rounded-2xl bg-[#111] border border-white/10 p-4 card-elevated space-y-3">
+        <div className="rounded-2xl bg-[--surface] border border-white/[0.06] p-4 card-elevated space-y-3">
           <NumInput
             label="Calories"
             value={form.calories}
@@ -210,7 +210,7 @@ export default function LogPage() {
       {/* TIME */}
       <div className="mx-4 mb-3">
         <p className="text-[9px] font-mono uppercase tracking-[0.14em] text-zinc-700 mb-2 px-1">Time</p>
-        <div className="rounded-2xl bg-[#111] border border-white/10 p-4 card-elevated space-y-3">
+        <div className="rounded-2xl bg-[--surface] border border-white/[0.06] p-4 card-elevated space-y-3">
           <NumInput
             label="Screen Time"
             value={form.screenTime}
@@ -234,7 +234,7 @@ export default function LogPage() {
       {/* HABITS */}
       <div className="mx-4 mb-3">
         <p className="text-[9px] font-mono uppercase tracking-[0.14em] text-zinc-700 mb-2 px-1">Habits</p>
-        <div className="rounded-2xl bg-[#111] border border-white/10 p-4 card-elevated space-y-4">
+        <div className="rounded-2xl bg-[--surface] border border-white/[0.06] p-4 card-elevated space-y-4">
           <Toggle
             label="Smoked Today"
             value={form.smokedToday}
@@ -259,7 +259,7 @@ export default function LogPage() {
       {/* MENTAL */}
       <div className="mx-4 mb-3">
         <p className="text-[9px] font-mono uppercase tracking-[0.14em] text-zinc-700 mb-2 px-1">Mental</p>
-        <div className="rounded-2xl bg-[#111] border border-white/10 p-4 card-elevated space-y-4">
+        <div className="rounded-2xl bg-[--surface] border border-white/[0.06] p-4 card-elevated space-y-4">
           <ConfidencePicker
             value={form.confidenceScore}
             onChange={(v) => update('confidenceScore', v)}
@@ -273,7 +273,7 @@ export default function LogPage() {
               onChange={(e) => update('notes', e.target.value)}
               placeholder="What's going on today? What matters most?"
               rows={4}
-              className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-sm text-zinc-300 placeholder-zinc-700 focus:outline-none focus:border-blue-500/30 transition-colors resize-none leading-relaxed"
+              className="w-full bg-[--surface-raised] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-zinc-300 placeholder-zinc-700 focus:outline-none focus:border-pink-500/30 transition-colors resize-none leading-relaxed"
             />
           </div>
         </div>
@@ -286,7 +286,7 @@ export default function LogPage() {
           className={`w-full py-4 rounded-2xl text-sm font-semibold transition-all duration-300 flex items-center justify-center gap-2 ${
             saved
               ? 'bg-green-500/20 border border-green-500/30 text-green-400'
-              : 'bg-blue-600 hover:bg-blue-500 text-white'
+              : 'bg-gradient-to-r from-pink-500 to-cyan-400 text-white hover:opacity-90'
           }`}
         >
           {saved ? (

@@ -85,7 +85,7 @@ function WeekSummary({ logs }: { logs: ActivityLog[] }) {
     { label: 'Steps', value: totalSteps > 0 ? `${(totalSteps / 1000).toFixed(1)}k` : '—', sub: 'from workouts' },
   ]
   return (
-    <div className="mx-4 mt-3 rounded-2xl bg-[#111] border border-white/10 p-4 card-elevated">
+    <div className="mx-4 mt-3 rounded-2xl bg-[#181818] border border-white/[0.06] p-4 card-elevated">
       <p className="text-[9px] font-mono uppercase tracking-widest text-zinc-600 mb-3">This Week</p>
       <div className="grid grid-cols-4 gap-2">
         {stats.map(({ label, value, sub }) => (
@@ -179,13 +179,13 @@ function LogActivityForm({ onSaved }: { onSaved: () => void }) {
       {!open ? (
         <button
           onClick={() => setOpen(true)}
-          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-colors"
+          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-gradient-to-r from-pink-500 to-cyan-400 text-white text-sm font-semibold hover:opacity-90 transition-all"
         >
           <Plus size={16} />
           Log Activity
         </button>
       ) : (
-        <div className="rounded-2xl bg-[#111] border border-white/10 p-4 card-elevated space-y-4">
+        <div className="rounded-2xl bg-[#181818] border border-white/[0.06] p-4 card-elevated space-y-4">
           <div className="flex items-center justify-between">
             <p className="text-[9px] font-mono uppercase tracking-widest text-zinc-600">New Activity</p>
             <button onClick={() => setOpen(false)} className="text-zinc-700 hover:text-zinc-400 transition-colors">
@@ -204,7 +204,7 @@ function LogActivityForm({ onSaved }: { onSaved: () => void }) {
                     key={t}
                     onClick={() => set('type', t)}
                     className={`px-2.5 py-1 rounded-full text-[10px] font-mono border transition-all ${
-                      form.type === t ? `${c.bg} ${c.border} ${c.text}` : 'border-white/10 text-zinc-700'
+                      form.type === t ? `${c.bg} ${c.border} ${c.text}` : 'border-white/[0.08] text-zinc-700'
                     }`}
                   >
                     {ACTIVITY_TYPE_LABELS[t]}
@@ -221,7 +221,7 @@ function LogActivityForm({ onSaved }: { onSaved: () => void }) {
               value={form.label}
               onChange={(e) => set('label', e.target.value)}
               placeholder={`e.g. Upper — Chest & Back`}
-              className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-zinc-300 placeholder-zinc-700 focus:outline-none focus:border-blue-500/30 transition-colors"
+              className="w-full bg-[--surface-raised] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-zinc-300 placeholder-zinc-700 focus:outline-none focus:border-pink-500/30 transition-colors"
             />
           </div>
 
@@ -234,7 +234,7 @@ function LogActivityForm({ onSaved }: { onSaved: () => void }) {
                 value={form.duration}
                 onChange={(e) => set('duration', e.target.value)}
                 placeholder="45"
-                className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-zinc-300 placeholder-zinc-700 focus:outline-none focus:border-blue-500/30 transition-colors"
+                className="w-full bg-[--surface-raised] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-zinc-300 placeholder-zinc-700 focus:outline-none focus:border-pink-500/30 transition-colors"
               />
             </div>
             <div>
@@ -246,7 +246,7 @@ function LogActivityForm({ onSaved }: { onSaved: () => void }) {
                 value={showDistance ? form.distance : form.rpe}
                 onChange={(e) => showDistance ? set('distance', e.target.value) : set('rpe', e.target.value)}
                 placeholder={showDistance ? '3.1' : '7'}
-                className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-zinc-300 placeholder-zinc-700 focus:outline-none focus:border-blue-500/30 transition-colors"
+                className="w-full bg-[--surface-raised] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-zinc-300 placeholder-zinc-700 focus:outline-none focus:border-pink-500/30 transition-colors"
               />
             </div>
           </div>
@@ -260,7 +260,7 @@ function LogActivityForm({ onSaved }: { onSaved: () => void }) {
                 value={form.steps}
                 onChange={(e) => set('steps', e.target.value)}
                 placeholder="8000"
-                className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-zinc-300 placeholder-zinc-700 focus:outline-none focus:border-blue-500/30 transition-colors"
+                className="w-full bg-[--surface-raised] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-zinc-300 placeholder-zinc-700 focus:outline-none focus:border-pink-500/30 transition-colors"
               />
             </div>
           )}
@@ -272,7 +272,7 @@ function LogActivityForm({ onSaved }: { onSaved: () => void }) {
                 <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">Exercises</p>
                 <button
                   onClick={addExercise}
-                  className="flex items-center gap-1 text-[10px] font-mono text-blue-400 hover:text-blue-300 transition-colors"
+                  className="flex items-center gap-1 text-[10px] font-mono text-cyan-400 hover:text-cyan-300 transition-colors"
                 >
                   <Plus size={11} />
                   Add
@@ -282,7 +282,7 @@ function LogActivityForm({ onSaved }: { onSaved: () => void }) {
                 <p className="text-[10px] text-zinc-700 font-mono py-2">No exercises added — tap Add to log sets.</p>
               )}
               {form.exercises.map((ex, i) => (
-                <div key={i} className="mb-2 bg-[#0a0a0a] rounded-xl border border-white/10 p-3">
+                <div key={i} className="mb-2 bg-[--surface-raised] rounded-xl border border-white/[0.08] p-3">
                   <div className="flex items-center gap-2 mb-2">
                     <input
                       value={ex.exercise}
@@ -306,13 +306,13 @@ function LogActivityForm({ onSaved }: { onSaved: () => void }) {
                         value={(ex as Record<string, string>)[key]}
                         onChange={(e) => updateExercise(i, key, e.target.value)}
                         placeholder={placeholder}
-                        className="bg-[#111] border border-white/10 rounded-lg px-2 py-1.5 text-xs text-zinc-300 placeholder-zinc-700 focus:outline-none text-center"
+                        className="bg-[--surface-raised] border border-white/[0.08] rounded-lg px-2 py-1.5 text-xs text-zinc-300 placeholder-zinc-700 focus:outline-none text-center"
                       />
                     ))}
                     <select
                       value={ex.weightUnit}
                       onChange={(e) => updateExercise(i, 'weightUnit', e.target.value)}
-                      className="bg-[#111] border border-white/10 rounded-lg px-1 py-1.5 text-xs text-zinc-400 focus:outline-none"
+                      className="bg-[--surface-raised] border border-white/[0.08] rounded-lg px-1 py-1.5 text-xs text-zinc-400 focus:outline-none"
                     >
                       <option value="lb">lb</option>
                       <option value="kg">kg</option>
@@ -332,7 +332,7 @@ function LogActivityForm({ onSaved }: { onSaved: () => void }) {
               onChange={(e) => set('notes', e.target.value)}
               placeholder="How did it feel?"
               rows={2}
-              className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-zinc-300 placeholder-zinc-700 focus:outline-none focus:border-blue-500/30 transition-colors resize-none"
+              className="w-full bg-[--surface-raised] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-zinc-300 placeholder-zinc-700 focus:outline-none focus:border-pink-500/30 transition-colors resize-none"
             />
           </div>
 
@@ -343,7 +343,7 @@ function LogActivityForm({ onSaved }: { onSaved: () => void }) {
             className={`w-full py-3 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
               saved
                 ? 'bg-green-500/20 border border-green-500/30 text-green-400'
-                : 'bg-blue-600 hover:bg-blue-500 text-white'
+                : 'bg-gradient-to-r from-pink-500 to-cyan-400 text-white hover:opacity-90'
             }`}
           >
             {saved ? (
@@ -369,7 +369,7 @@ function ActivityCard({ log }: { log: ActivityLog }) {
   const hasExercises = log.exercises && log.exercises.length > 0
 
   return (
-    <div className="rounded-xl bg-[#0a0a0a] border border-white/[0.07] p-3.5 mb-2">
+    <div className="rounded-xl bg-[#181818] border border-white/[0.06] p-3.5 mb-2">
       <div
         className="flex items-center justify-between"
         onClick={() => hasExercises && setExpanded((p) => !p)}
@@ -436,7 +436,7 @@ function ActivityHistory({ logs }: { logs: ActivityLog[] }) {
 
   if (dates.length === 0) {
     return (
-      <div className="mx-4 mt-3 rounded-2xl bg-[#111] border border-white/10 p-5 card-elevated text-center">
+      <div className="mx-4 mt-3 rounded-2xl bg-[#181818] border border-white/[0.06] p-5 card-elevated text-center">
         <p className="text-sm text-zinc-600">No activities logged yet.</p>
       </div>
     )
@@ -445,7 +445,7 @@ function ActivityHistory({ logs }: { logs: ActivityLog[] }) {
   return (
     <div className="mx-4 mt-3">
       <p className="text-[9px] font-mono uppercase tracking-[0.14em] text-zinc-700 mb-2 px-1">Activity History</p>
-      <div className="rounded-2xl bg-[#111] border border-white/10 p-4 card-elevated">
+      <div className="rounded-2xl bg-[#181818] border border-white/[0.06] p-4 card-elevated">
         {dates.map((date) => {
           const label = new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
           return (
@@ -473,7 +473,7 @@ function ProgressiveOverload({ logs }: { logs: ActivityLog[] }) {
   if (withHistory.length === 0) return null
 
   return (
-    <div className="mx-4 mt-3 rounded-2xl bg-[#111] border border-white/10 p-5 card-elevated">
+    <div className="mx-4 mt-3 rounded-2xl bg-[#181818] border border-white/[0.06] p-5 card-elevated">
       <p className="text-[9px] font-mono uppercase tracking-widest text-zinc-600 mb-4">Progressive Overload</p>
       <div className="flex flex-col gap-5">
         {withHistory.slice(0, 5).map(({ name, history }) => {
@@ -495,7 +495,7 @@ function ProgressiveOverload({ logs }: { logs: ActivityLog[] }) {
                   {' '}vs last · {history.length} sessions
                 </p>
                 {suggestion && (
-                  <p className="text-[9px] font-mono text-blue-400/70 mt-0.5">
+                  <p className="text-[9px] font-mono text-cyan-400/70 mt-0.5">
                     Next: {suggestion.weight}lb (+{suggestion.increment})
                   </p>
                 )}
@@ -525,7 +525,7 @@ interface IntegrationCardProps {
 function IntegrationCard({ name, tagline, dataPoints, setupPath, accentClass }: IntegrationCardProps) {
   const [expanded, setExpanded] = useState(false)
   return (
-    <div className="rounded-xl bg-[#0a0a0a] border border-white/[0.07] overflow-hidden">
+    <div className="rounded-xl bg-[#181818] border border-white/[0.06] overflow-hidden">
       <div
         className="flex items-center justify-between px-4 py-3 cursor-pointer"
         onClick={() => setExpanded((p) => !p)}
@@ -567,7 +567,7 @@ function RecoveryCard() {
   const { recovery } = JACKSON.today
   const scoreColor = recovery.score >= 70 ? 'text-green-400' : recovery.score >= 50 ? 'text-amber-400' : 'text-red-400'
   return (
-    <div className="mx-4 mt-3 rounded-2xl bg-[#111] border border-white/10 p-5 card-elevated glow-green">
+    <div className="mx-4 mt-3 rounded-2xl bg-[#181818] border border-white/[0.06] p-5 card-elevated glow-cyan">
       <div className="flex items-center justify-between mb-4">
         <p className="text-[9px] font-mono uppercase tracking-widest text-zinc-600">Recovery · WHOOP (mock)</p>
         <span className="text-[9px] font-mono text-zinc-700 bg-zinc-800/60 px-2 py-0.5 rounded-full">Estimated</span>
@@ -577,7 +577,7 @@ function RecoveryCard() {
           { label: 'Recovery', value: `${recovery.score}%`, color: scoreColor },
           { label: 'HRV', value: `${recovery.hrv}ms`, color: 'text-white' },
           { label: 'RHR', value: `${recovery.restingHR}`, color: 'text-white' },
-          { label: 'Sleep', value: `${recovery.sleepHours}h`, color: 'text-blue-400' },
+          { label: 'Sleep', value: `${recovery.sleepHours}h`, color: 'text-cyan-400' },
         ].map(({ label, value, color }) => (
           <div key={label}>
             <p className="text-[8px] font-mono uppercase tracking-wider text-zinc-700">{label}</p>
@@ -613,12 +613,15 @@ export default function FitnessPage() {
   return (
     <div className="pb-8">
       {/* Header */}
-      <div className="px-4 pt-7 pb-4">
-        <p className="text-[10px] font-mono uppercase tracking-[0.12em] text-zinc-600">Performance</p>
-        <h1 className="text-2xl font-semibold text-white mt-1 tracking-tight">Fitness</h1>
-        <p className="text-xs text-zinc-600 mt-1 font-mono">
-          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-        </p>
+      <div className="relative px-5 pt-10 pb-6 lg:px-10 border-b border-white/[0.05] overflow-hidden mb-3">
+        <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse at 15% 0%, rgba(34,211,238,0.07) 0%, rgba(236,72,153,0.03) 50%, transparent 70%)' }} />
+        <div className="relative">
+          <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-600 mb-2">Performance</p>
+          <h1 className="font-display font-light text-3xl lg:text-4xl text-white tracking-tight leading-none">Fitness</h1>
+          <p className="text-[13px] text-zinc-600 mt-2 font-mono">
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+          </p>
+        </div>
       </div>
 
       <RecoveryCard />
@@ -630,7 +633,7 @@ export default function FitnessPage() {
       {/* Integrations */}
       <div className="mx-4 mt-3">
         <p className="text-[9px] font-mono uppercase tracking-[0.14em] text-zinc-700 mb-2 px-1">Integrations</p>
-        <div className="rounded-2xl bg-[#111] border border-white/10 p-4 card-elevated space-y-2">
+        <div className="rounded-2xl bg-[#181818] border border-white/[0.06] p-4 card-elevated space-y-2">
           <IntegrationCard
             name="WHOOP"
             tagline="OAuth 2.0"

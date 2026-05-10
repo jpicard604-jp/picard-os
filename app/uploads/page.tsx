@@ -124,9 +124,12 @@ export default function UploadsPage() {
 
   return (
     <div className="pb-4">
-      <div className="px-4 pt-7 pb-4">
-        <p className="text-[10px] font-mono uppercase tracking-[0.12em] text-zinc-600">Knowledge Base</p>
-        <h1 className="text-2xl font-semibold text-white mt-1 tracking-tight">Upload Center</h1>
+      <div className="relative px-5 pt-10 pb-6 lg:px-10 border-b border-white/[0.05] overflow-hidden mb-4">
+        <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse at 15% 0%, rgba(236,72,153,0.07) 0%, rgba(34,211,238,0.02) 50%, transparent 70%)' }} />
+        <div className="relative">
+          <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-600 mb-2">Knowledge Base</p>
+          <h1 className="font-display font-light text-3xl lg:text-4xl text-white tracking-tight leading-none">Upload Center</h1>
+        </div>
       </div>
 
       {/* Drop zone */}
@@ -136,16 +139,16 @@ export default function UploadsPage() {
         onDrop={onDrop}
         className={`mx-4 rounded-2xl border-2 border-dashed p-8 flex flex-col items-center gap-3 transition-all duration-200 ${
           dragging
-            ? 'border-blue-500/60 bg-blue-500/5'
-            : 'border-white/10 bg-[#0f0f0f]'
+            ? 'border-pink-500/60 bg-pink-500/[0.04]'
+            : 'border-white/[0.08] bg-[#181818]'
         }`}
       >
         <div
           className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors duration-200 ${
-            dragging ? 'bg-blue-500/15' : 'bg-white/5'
+            dragging ? 'bg-pink-500/15' : 'bg-white/5'
           }`}
         >
-          <Upload size={22} className={dragging ? 'text-blue-400' : 'text-zinc-600'} />
+          <Upload size={22} className={dragging ? 'text-pink-400' : 'text-zinc-600'} />
         </div>
         <div className="text-center">
           <p className="text-sm font-medium text-white">
@@ -162,7 +165,7 @@ export default function UploadsPage() {
             accept=".pdf,.jpg,.jpeg,.png,.mp3,.m4a,.wav,.csv,.txt,.md"
             onChange={(e) => addFiles(e.target.files)}
           />
-          <span className="text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors border border-blue-500/30 rounded-lg px-3 py-1.5">
+          <span className="text-xs font-medium text-pink-400 hover:text-pink-300 transition-colors border border-pink-500/30 rounded-lg px-3 py-1.5">
             Browse files
           </span>
         </label>
@@ -176,8 +179,8 @@ export default function UploadsPage() {
             onClick={() => setActiveCategory(cat)}
             className={`flex-shrink-0 text-[10px] font-mono uppercase tracking-wider px-3 py-1.5 rounded-full border transition-all duration-150 ${
               activeCategory === cat
-                ? 'border-blue-500/40 text-blue-400 bg-blue-500/10'
-                : 'border-white/10 text-zinc-600 bg-[#111]'
+                ? 'border-pink-500/40 text-pink-400 bg-pink-500/10'
+                : 'border-white/[0.08] text-zinc-600 bg-[#181818]'
             }`}
           >
             {cat}
@@ -186,7 +189,7 @@ export default function UploadsPage() {
       </div>
 
       {/* Upload history */}
-      <div className="mx-4 mt-3 rounded-2xl bg-[#111] border border-white/10 overflow-hidden card-elevated">
+      <div className="mx-4 mt-3 rounded-2xl bg-[#181818] border border-white/[0.06] overflow-hidden card-elevated">
         <div className="px-4 py-3 border-b border-white/[0.06]">
           <p className="text-[9px] font-mono uppercase tracking-widest text-zinc-600">
             {filtered.length} file{filtered.length !== 1 ? 's' : ''}

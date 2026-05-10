@@ -21,7 +21,9 @@
       "Bash(Write-Host \"done\")",
       "PowerShell(New-Item *)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\jpica\\\\Projects\\\\picard-os\" -Force)",
-      "Bash(Select-Object Name, FullName)"
+      "Bash(Select-Object Name, FullName)",
+      "Bash(npm audit *)",
+      "Bash(npx shadcn@latest *)"
     ]
   }
 }

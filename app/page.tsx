@@ -10,25 +10,46 @@ import StackPreview from '@/components/dashboard/StackPreview'
 
 export default function DashboardPage() {
   return (
-    <>
-      <CommandCenter />
-      <div className="lg:grid lg:grid-cols-[1fr_340px] lg:gap-6 lg:p-6 lg:pt-5">
-        {/* Left — capture + intelligence */}
-        <div>
-          <QuickCapture />
-          <XodusCard />
-          <WhatNeedsAttention />
-          <TodayTimeline />
+    <div className="p-4 lg:p-6 space-y-4">
+      {/* Hero strip — Today Overview + Score Rings */}
+      <div className="animate-in" style={{ animationDelay: '0ms' }}>
+        <CommandCenter />
+      </div>
+
+      {/* Main content grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4">
+        {/* Left column */}
+        <div className="space-y-4">
+          <div className="animate-in" style={{ animationDelay: '60ms' }}>
+            <XodusCard />
+          </div>
+          <div className="animate-in" style={{ animationDelay: '120ms' }}>
+            <ActivityOverview />
+          </div>
+          <div className="animate-in" style={{ animationDelay: '180ms' }}>
+            <QuickCapture />
+          </div>
+          <div className="animate-in" style={{ animationDelay: '240ms' }}>
+            <WhatNeedsAttention />
+          </div>
         </div>
-        {/* Right — metrics */}
-        <div>
-          <ActivityOverview />
-          <QuickStats />
-          <ProjectSummary />
-          <StackPreview />
+
+        {/* Right column */}
+        <div className="space-y-4">
+          <div className="animate-in" style={{ animationDelay: '80ms' }}>
+            <QuickStats />
+          </div>
+          <div className="animate-in" style={{ animationDelay: '140ms' }}>
+            <TodayTimeline />
+          </div>
+          <div className="animate-in" style={{ animationDelay: '200ms' }}>
+            <ProjectSummary />
+          </div>
+          <div className="animate-in" style={{ animationDelay: '260ms' }}>
+            <StackPreview />
+          </div>
         </div>
       </div>
-      <div className="h-6" />
-    </>
+    </div>
   )
 }

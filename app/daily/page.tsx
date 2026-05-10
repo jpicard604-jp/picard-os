@@ -33,7 +33,7 @@ function NumInput({
 }) {
   return (
     <FieldWrap label={label} hint={hint}>
-      <div className="flex items-center gap-2 bg-[--surface-raised] border border-white/[0.09] rounded-xl px-4 py-3.5 focus-within:border-sky-500/35 transition-colors">
+      <div className="flex items-center gap-2 bg-[--surface-raised] border border-white/[0.08] rounded-xl px-4 py-3.5 focus-within:border-pink-500/30 transition-colors">
         <input
           type="number"
           inputMode={decimal ? 'decimal' : 'numeric'}
@@ -50,8 +50,8 @@ function NumInput({
 
 function Toggle({
   label, value, onChange, trueLabel = 'Yes', falseLabel = 'No',
-  trueColor = 'bg-red-500/12 border-red-500/25 text-red-300',
-  falseColor = 'bg-green-500/12 border-green-500/25 text-green-300',
+  trueColor = 'bg-pink-500/12 border-pink-500/25 text-pink-300',
+  falseColor = 'bg-cyan-500/12 border-cyan-500/25 text-cyan-300',
 }: {
   label: string; value: boolean; onChange: (v: boolean) => void
   trueLabel?: string; falseLabel?: string; trueColor?: string; falseColor?: string
@@ -97,9 +97,9 @@ function ScorePicker({
             className={`flex-1 py-3 rounded-xl text-[12px] font-mono font-semibold border transition-all duration-150 ${
               value === n
                 ? n >= t.high
-                  ? 'bg-green-500/15 border-green-500/35 text-green-300'
+                  ? 'bg-cyan-500/15 border-cyan-500/35 text-cyan-300'
                   : n >= t.mid
-                  ? 'bg-sky-500/15 border-sky-500/35 text-sky-300'
+                  ? 'bg-pink-500/15 border-pink-500/35 text-pink-300'
                   : 'bg-amber-500/15 border-amber-500/35 text-amber-300'
                 : 'border-white/[0.07] text-zinc-700 bg-transparent hover:border-white/[0.12] hover:text-zinc-500'
             }`}
@@ -155,7 +155,7 @@ export default function DailyPage() {
       <div className="relative px-5 pt-10 pb-7 lg:px-10 border-b border-white/[0.05] overflow-hidden">
         <div
           className="absolute top-0 left-0 w-full h-full pointer-events-none"
-          style={{ background: 'radial-gradient(ellipse at 15% 0%, rgba(59,130,246,0.04) 0%, transparent 60%)' }}
+          style={{ background: 'radial-gradient(ellipse at 15% 0%, rgba(236,72,153,0.07) 0%, rgba(34,211,238,0.03) 50%, transparent 70%)' }}
         />
         <div className="relative">
           <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-600 mb-2">Daily Check-In</p>
@@ -168,7 +168,22 @@ export default function DailyPage() {
         </div>
       </div>
 
-      <div className="pt-5">
+      {/* Live snapshot bar */}
+      <div className="mx-4 mt-4 mb-1 grid grid-cols-4 gap-2">
+        {[
+          { label: 'Weight', value: form.weight ? `${form.weight}` : '—', unit: 'lb', color: 'text-cyan-400' },
+          { label: 'Sleep',  value: form.sleepHours ? `${form.sleepHours}` : '—', unit: 'h', color: 'text-purple-400' },
+          { label: 'Cals',   value: form.calories ? `${form.calories}` : '—', unit: 'kcal', color: 'text-pink-400' },
+          { label: 'Mood',   value: form.mood ? `${form.mood}/5` : '—', unit: '', color: form.mood && form.mood >= 4 ? 'text-cyan-400' : form.mood && form.mood >= 3 ? 'text-purple-400' : 'text-pink-400' },
+        ].map(({ label, value, unit, color }) => (
+          <div key={label} className="rounded-xl bg-[--surface] border border-white/[0.06] px-3 py-2.5 text-center">
+            <p className={`text-sm font-mono font-bold ${color} leading-none`}>{value}<span className="text-[9px] text-zinc-700 ml-0.5">{unit}</span></p>
+            <p className="text-[8px] font-mono uppercase tracking-wider text-zinc-700 mt-1">{label}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="pt-3">
         <Section title="Body">
           <div className="grid grid-cols-2 gap-4">
             <NumInput label="Body Weight" value={form.weight} onChange={(v) => update('weight', v)}
@@ -221,7 +236,7 @@ export default function DailyPage() {
               onChange={(e) => update('notes', e.target.value)}
               placeholder="What's on your mind today?"
               rows={4}
-              className="w-full bg-[--surface-raised] border border-white/[0.09] rounded-xl px-4 py-3.5 text-[14px] text-zinc-200 placeholder-zinc-700 focus:outline-none focus:border-sky-500/35 transition-colors resize-none leading-relaxed"
+              className="w-full bg-[--surface-raised] border border-white/[0.08] rounded-xl px-4 py-3.5 text-[14px] text-zinc-200 placeholder-zinc-700 focus:outline-none focus:border-pink-500/30 transition-colors resize-none leading-relaxed"
             />
           </FieldWrap>
         </Section>
@@ -232,8 +247,8 @@ export default function DailyPage() {
             onClick={save}
             className={`w-full py-4 rounded-2xl text-[14px] font-semibold transition-all duration-300 flex items-center justify-center gap-2 tracking-wide ${
               saved
-                ? 'bg-green-500/12 border border-green-500/25 text-green-300'
-                : 'bg-white text-zinc-950 hover:bg-zinc-100 active:scale-[0.99]'
+                ? 'bg-cyan-500/12 border border-cyan-500/25 text-cyan-300'
+                : 'bg-gradient-to-r from-pink-500 to-cyan-400 text-white hover:opacity-90 active:scale-[0.99]'
             }`}
           >
             {saved ? (

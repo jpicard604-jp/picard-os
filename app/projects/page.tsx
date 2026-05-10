@@ -6,16 +6,16 @@ import { getProjects, saveProjects, daysUntil } from '@/lib/projects'
 import type { Project, Task } from '@/lib/projects'
 
 const URGENCY_STYLES = {
-  LOW: { badge: 'text-green-400 bg-green-400/10 border-green-400/20', dot: 'bg-green-400' },
-  MODERATE: { badge: 'text-blue-400 bg-blue-400/10 border-blue-400/20', dot: 'bg-blue-400' },
-  HIGH: { badge: 'text-amber-400 bg-amber-400/10 border-amber-400/20', dot: 'bg-amber-400' },
-  CRITICAL: { badge: 'text-red-400 bg-red-400/10 border-red-400/20', dot: 'bg-red-400' },
+  LOW:      { badge: 'text-cyan-400 bg-cyan-400/10 border-cyan-400/20',     dot: 'bg-cyan-400'   },
+  MODERATE: { badge: 'text-purple-400 bg-purple-400/10 border-purple-400/20', dot: 'bg-purple-400' },
+  HIGH:     { badge: 'text-pink-400 bg-pink-400/10 border-pink-400/20',     dot: 'bg-pink-400'   },
+  CRITICAL: { badge: 'text-pink-300 bg-pink-500/15 border-pink-500/30',     dot: 'bg-pink-400 shadow-[0_0_6px_rgba(236,72,153,0.5)]' },
 }
 
 const STATUS_STYLES = {
-  active: { text: 'text-green-400', bg: 'bg-green-400/10 border-green-400/20' },
-  paused: { text: 'text-amber-400', bg: 'bg-amber-400/10 border-amber-400/20' },
-  complete: { text: 'text-zinc-500', bg: 'bg-zinc-500/10 border-zinc-500/20' },
+  active:   { text: 'text-cyan-400',   bg: 'bg-cyan-400/10 border-cyan-400/20'     },
+  paused:   { text: 'text-purple-400', bg: 'bg-purple-400/10 border-purple-400/20' },
+  complete: { text: 'text-zinc-500',   bg: 'bg-zinc-500/10 border-zinc-500/20'     },
 }
 
 const PRIORITY_LABEL = { 1: 'P1', 2: 'P2', 3: 'P3', 4: 'P4', 5: 'P5' }
@@ -62,7 +62,7 @@ function ProjectCard({
   const nextTask = project.tasks.find((t) => !t.done)
 
   return (
-    <div className="rounded-2xl bg-[#111] border border-white/[0.08] overflow-hidden card-elevated mb-3">
+    <div className="rounded-2xl bg-[#181818] border border-white/[0.06] overflow-hidden card-elevated mb-3">
       {/* Card header */}
       <button
         onClick={() => setExpanded((v) => !v)}
@@ -93,10 +93,8 @@ function ProjectCard({
         <div className="flex items-center gap-2.5 mb-2">
           <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
             <div
-              className={`h-full rounded-full transition-all duration-500 ${
-                project.progress >= 80 ? 'bg-green-500' : project.progress >= 50 ? 'bg-blue-500' : 'bg-zinc-500'
-              }`}
-              style={{ width: `${project.progress}%` }}
+              className="h-full rounded-full transition-all duration-500"
+              style={{ width: `${project.progress}%`, background: 'linear-gradient(to right, #22d3ee, #ec4899)' }}
             />
           </div>
           <span className="text-[9px] font-mono text-zinc-600 flex-shrink-0">{project.progress}%</span>
@@ -183,9 +181,12 @@ export default function ProjectsPage() {
   return (
     <div className="pb-8">
       {/* Header */}
-      <div className="px-4 pt-7 pb-4">
-        <p className="text-[10px] font-mono uppercase tracking-[0.12em] text-zinc-600">Command</p>
-        <h1 className="text-2xl font-semibold text-white mt-1 tracking-tight">Projects</h1>
+      <div className="relative px-5 pt-10 pb-6 lg:px-10 border-b border-white/[0.05] overflow-hidden mb-3">
+        <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse at 15% 0%, rgba(236,72,153,0.07) 0%, rgba(34,211,238,0.02) 50%, transparent 70%)' }} />
+        <div className="relative">
+          <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-600 mb-2">Command</p>
+          <h1 className="font-display font-light text-3xl lg:text-4xl text-white tracking-tight leading-none">Projects</h1>
+        </div>
       </div>
 
       {/* Summary bar */}
@@ -195,7 +196,7 @@ export default function ProjectsPage() {
           { label: 'Avg Progress', value: `${avgProgress}%` },
           { label: 'Total Tasks', value: projects.reduce((s, p) => s + p.tasks.length, 0) },
         ].map(({ label, value }) => (
-          <div key={label} className="rounded-xl bg-[#111] border border-white/[0.08] px-3 py-3 text-center card-elevated">
+          <div key={label} className="rounded-2xl bg-[#181818] border border-white/[0.06] px-3 py-3 text-center card-elevated">
             <p className="text-base font-mono font-bold text-white">{value}</p>
             <p className="text-[8px] font-mono uppercase tracking-wider text-zinc-600 mt-0.5">{label}</p>
           </div>
@@ -210,8 +211,8 @@ export default function ProjectsPage() {
             onClick={() => setFilter(f)}
             className={`flex-1 py-2 rounded-lg text-[10px] font-mono uppercase tracking-wider border transition-all duration-150 ${
               filter === f
-                ? 'border-blue-500/40 text-blue-400 bg-blue-500/10'
-                : 'border-white/10 text-zinc-600 bg-[#111]'
+                ? 'border-pink-500/40 text-pink-400 bg-pink-500/10'
+                : 'border-white/[0.08] text-zinc-600 bg-[#181818]'
             }`}
           >
             {f}
@@ -222,7 +223,7 @@ export default function ProjectsPage() {
       {/* Project list */}
       <div className="mx-4">
         {filtered.length === 0 ? (
-          <div className="rounded-2xl bg-[#111] border border-white/[0.08] px-4 py-8 text-center">
+          <div className="rounded-2xl bg-[#181818] border border-white/[0.06] px-4 py-8 text-center">
             <p className="text-sm text-zinc-600">No {filter} projects</p>
           </div>
         ) : (

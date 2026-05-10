@@ -79,11 +79,11 @@ export default function WhatNeedsAttention() {
   if (alerts.length === 0) return null
 
   return (
-    <div className="mx-4 mt-3">
-      <p className="text-[9px] font-mono uppercase tracking-[0.14em] text-zinc-700 mb-2 px-0.5">
+    <div>
+      <p className="text-[9px] font-mono uppercase tracking-[0.14em] text-zinc-600 mb-2 px-0.5">
         Attention · {alerts.length}
       </p>
-      <div className="rounded-xl bg-[#0f0f0f] border border-white/[0.06] overflow-hidden">
+      <div className="rounded-2xl bg-[#181818] border border-white/[0.06] overflow-hidden">
         {alerts.map((alert, i) => (
           <AlertRow key={i} alert={alert} />
         ))}

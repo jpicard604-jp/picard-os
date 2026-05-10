@@ -19,10 +19,10 @@ import { getThisWeekLogs } from '@/lib/fitness'
 import CommandInbox from '@/components/xodus/CommandInbox'
 
 const URGENCY_STYLE: Record<UrgencyLevel, { pill: string; dot: string; accent: string }> = {
-  LOW:      { pill: 'text-green-400 bg-green-400/10 border-green-400/20',  dot: 'bg-green-400',  accent: 'rgba(34,197,94,0.06)'    },
-  MODERATE: { pill: 'text-sky-400 bg-sky-400/10 border-sky-400/20',        dot: 'bg-sky-400',    accent: 'rgba(56,189,248,0.06)'   },
-  HIGH:     { pill: 'text-amber-400 bg-amber-400/10 border-amber-400/20',  dot: 'bg-amber-400',  accent: 'rgba(245,158,11,0.055)'  },
-  CRITICAL: { pill: 'text-red-400 bg-red-400/10 border-red-400/20',        dot: 'bg-red-400',    accent: 'rgba(239,68,68,0.055)'   },
+  LOW:      { pill: 'text-cyan-400 bg-cyan-400/10 border-cyan-400/20',       dot: 'bg-cyan-400',   accent: 'rgba(34,211,238,0.06)'  },
+  MODERATE: { pill: 'text-purple-400 bg-purple-400/10 border-purple-400/20', dot: 'bg-purple-400', accent: 'rgba(168,85,247,0.055)' },
+  HIGH:     { pill: 'text-pink-400 bg-pink-400/10 border-pink-400/20',       dot: 'bg-pink-400',   accent: 'rgba(236,72,153,0.07)'  },
+  CRITICAL: { pill: 'text-pink-300 bg-pink-500/15 border-pink-500/30',       dot: 'bg-pink-400',   accent: 'rgba(236,72,153,0.10)'  },
 }
 
 function buildExtras() {
@@ -56,15 +56,15 @@ function DailyBriefPanel({ output }: { output: XodusOutput }) {
         </span>
         <span className="text-[10px] font-mono text-zinc-600">Score <span className="text-white font-semibold">{executionScore}/100</span></span>
         <span className="text-zinc-700 text-[10px]">·</span>
-        <span className="text-[10px] font-mono text-zinc-600">Recovery <span className="text-green-400 font-semibold">{recoveryState}</span></span>
+        <span className="text-[10px] font-mono text-zinc-600">Recovery <span className="text-cyan-400 font-semibold">{recoveryState}</span></span>
       </div>
 
       {/* Brief card */}
       <div className="rounded-2xl bg-[--surface] border border-white/[0.07] overflow-hidden card-elevated">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.05]">
           <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.6)]" />
-            <span className="text-[10px] font-mono uppercase tracking-[0.14em] text-sky-400/80">
+            <div className="w-1.5 h-1.5 rounded-full bg-pink-400 shadow-[0_0_6px_rgba(236,72,153,0.6)]" />
+            <span className="text-[10px] font-mono uppercase tracking-[0.14em] text-pink-400/80">
               Daily Brief · {JACKSON.today.date}
             </span>
           </div>
@@ -99,7 +99,7 @@ function DailyBriefPanel({ output }: { output: XodusOutput }) {
       {/* Log CTA */}
       <Link
         href="/daily"
-        className="flex items-center justify-center w-full py-3 rounded-xl bg-sky-600/[0.07] border border-sky-500/20 text-[12px] font-medium text-sky-400 hover:bg-sky-600/[0.12] transition-colors"
+        className="flex items-center justify-center w-full py-3 rounded-xl bg-pink-500/[0.08] border border-pink-500/25 text-[12px] font-medium text-pink-400 hover:bg-pink-500/[0.14] transition-colors"
       >
         {loggedToday ? 'Update Today\'s Log →' : 'Log Today for Full Brief →'}
       </Link>
@@ -136,7 +136,7 @@ export default function XodusPage() {
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
-            background: `radial-gradient(ellipse at 15% 0%, ${style.accent} 0%, transparent 55%)`,
+            background: 'radial-gradient(ellipse at 15% 0%, rgba(236,72,153,0.08) 0%, rgba(34,211,238,0.03) 55%, transparent 80%)',
           }}
         />
         <div className="relative flex items-end justify-between">

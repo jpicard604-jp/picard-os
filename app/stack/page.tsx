@@ -8,11 +8,11 @@ import { getStorage, setStorage, STORAGE_KEYS, STORAGE_EVENTS, getTodayKey } fro
 const STACK_RESET_KEY = 'picard_stack_reset_v1'
 
 const CATEGORY_STYLES = {
-  Performance: 'text-blue-400 bg-blue-400/10 border-blue-400/20',
-  Recovery: 'text-green-400 bg-green-400/10 border-green-400/20',
-  Health: 'text-teal-400 bg-teal-400/10 border-teal-400/20',
-  Stimulant: 'text-amber-400 bg-amber-400/10 border-amber-400/20',
-  Peptide: 'text-purple-400 bg-purple-400/10 border-purple-400/20',
+  Performance: 'text-cyan-400 bg-cyan-400/10 border-cyan-400/20',
+  Recovery:    'text-cyan-400 bg-cyan-400/[0.07] border-cyan-400/15',
+  Health:      'text-purple-400 bg-purple-400/10 border-purple-400/20',
+  Stimulant:   'text-pink-400 bg-pink-400/10 border-pink-400/20',
+  Peptide:     'text-purple-400 bg-purple-400/[0.07] border-purple-400/15',
 }
 
 const TIMING_ORDER: CompoundTiming[] = ['AM', 'With meals', 'Pre-workout', 'PM', 'As needed']
@@ -34,13 +34,13 @@ function StackRow({
         onClick={() => onToggle(item.id)}
         className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 border transition-all duration-200 ${
           item.takenToday
-            ? 'bg-green-400/20 border-green-400/40'
+            ? 'bg-cyan-400/15 border-cyan-400/35'
             : 'bg-transparent border-white/20'
         }`}
         aria-label={item.takenToday ? 'Mark as not taken' : 'Mark as taken'}
       >
         {item.takenToday && (
-          <div className="w-2 h-2 rounded-full bg-green-400" />
+          <div className="w-2 h-2 rounded-full bg-cyan-400" />
         )}
       </button>
 
@@ -104,21 +104,24 @@ export default function StackPage() {
   return (
     <div className="pb-4">
       {/* Header */}
-      <div className="px-4 pt-7 pb-4">
-        <p className="text-[10px] font-mono uppercase tracking-[0.12em] text-zinc-600">Compounds</p>
-        <h1 className="text-2xl font-semibold text-white mt-1 tracking-tight">Daily Stack</h1>
+      <div className="relative px-5 pt-10 pb-6 lg:px-10 border-b border-white/[0.05] overflow-hidden mb-4">
+        <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse at 15% 0%, rgba(236,72,153,0.07) 0%, rgba(34,211,238,0.02) 50%, transparent 70%)' }} />
+        <div className="relative">
+          <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-600 mb-2">Compounds</p>
+          <h1 className="font-display font-light text-3xl lg:text-4xl text-white tracking-tight leading-none">Daily Stack</h1>
+        </div>
       </div>
 
       {/* Progress summary */}
-      <div className="mx-4 mb-3 rounded-xl bg-[#111] border border-white/10 px-4 py-3.5 card-elevated">
+      <div className="mx-4 mb-3 rounded-2xl bg-[#181818] border border-white/[0.06] px-4 py-3.5 card-elevated">
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs text-zinc-400 font-medium">{taken} of {total} taken today</span>
-          <span className="text-xs font-mono text-zinc-600">{Math.round((taken / total) * 100)}%</span>
+          <span className="text-xs font-mono text-pink-400">{Math.round((taken / total) * 100)}%</span>
         </div>
-        <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+        <div className="h-1 bg-white/[0.08] rounded-full overflow-hidden">
           <div
-            className="h-full bg-green-500 rounded-full transition-all duration-500"
-            style={{ width: `${(taken / total) * 100}%` }}
+            className="h-full rounded-full transition-all duration-500"
+            style={{ width: `${(taken / total) * 100}%`, background: 'linear-gradient(to right, #22d3ee, #ec4899)' }}
           />
         </div>
       </div>
@@ -132,7 +135,7 @@ export default function StackPage() {
       {Object.entries(grouped).map(([timing, group]) => (
         <div key={timing} className="mx-4 mt-2">
           <p className="text-[9px] font-mono uppercase tracking-[0.14em] text-zinc-600 mb-1.5 px-1">{timing}</p>
-          <div className="rounded-xl bg-[#111] border border-white/10 overflow-hidden card-elevated">
+          <div className="rounded-2xl bg-[#181818] border border-white/[0.06] overflow-hidden card-elevated">
             {group.map((item) => (
               <StackRow key={item.id} item={item} onToggle={toggle} />
             ))}
