@@ -1,0 +1,15 @@
+{
+  "timestamp": "2026-05-10T04:05:28.436Z",
+  "mode": "headless",
+  "workerType": "audit",
+  "model": "haiku",
+  "durationMs": 2381,
+  "executionId": "audit_1778385926055_q48x1i",
+  "success": false,
+  "findings": {
+    "parseError": true,
+    "rawOutput": "You're out of extra usage · resets 11:50pm (America/Los_Angeles)\n"
+  },
+  "rawOutputPreview": "You're out of extra usage · resets 11:50pm (America/Los_Angeles)\n",
+  "rawOutputLength": 65
+}

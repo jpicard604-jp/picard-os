@@ -28,7 +28,9 @@
       "Bash(Select-Object Name, LastWriteTime)",
       "PowerShell(Test-Path *)",
       "PowerShell(claude mcp *)",
-      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\jpica\\\\Projects\\\\picard-os\\\\.claude-flow\" -Force -Recurse | Select-Object -ExpandProperty FullName | ForEach-Object { $_.Replace\\(\"C:\\\\Users\\\\jpica\\\\Projects\\\\picard-os\\\\\", \"\"\\) })"
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\jpica\\\\Projects\\\\picard-os\\\\.claude-flow\" -Force -Recurse | Select-Object -ExpandProperty FullName | ForEach-Object { $_.Replace\\(\"C:\\\\Users\\\\jpica\\\\Projects\\\\picard-os\\\\\", \"\"\\) })",
+      "Bash(npm install *)",
+      "Bash(claude mcp *)"
     ]
   }
 }
