@@ -13,6 +13,7 @@ import { getProjects } from './projects'
 import { getActivityLogs } from './fitness'
 import { getTodayGoals } from './daily-goals'
 import { getNutritionProfile } from './nutrition-profile'
+import { getRecentNotes } from './xodus/notes'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -289,6 +290,31 @@ export function buildBrainGraph(): BrainGraphData {
     const snippet = v.transcript.slice(0, 60) + (v.transcript.length > 60 ? '…' : '')
     addNode({ id, label: 'Voice Log', type: 'note', size: 8, summary: snippet, date: v.timestamp.slice(0, 10), source: 'localStorage' })
     addEdge(edge('hub-xodus', id, 'note', 0.6))
+  }
+
+  // ── XODUS notes (last 6) ─────────────────────────────────────────────────
+  const xodusNotes = getRecentNotes(6)
+  for (const n of xodusNotes) {
+    const id = `xnote-${n.id}`
+    const nodeType: BrainNodeType =
+      n.category === 'grocery'  ? 'nutrition'
+      : n.category === 'fitness' ? 'fitness'
+      : n.category === 'school'  ? 'school'
+      : n.category === 'project' ? 'project'
+      : 'note'
+    const label =
+      n.category === 'grocery' ? 'Grocery note'
+      : n.title ? n.title
+      : 'XODUS note'
+    const summary = n.body.length > 60 ? n.body.slice(0, 60) + '…' : n.body
+    addNode({ id, label, type: nodeType, size: 8, summary, date: n.date, source: 'localStorage' })
+    addEdge(edge('hub-xodus', id, 'note', 0.6))
+    const dailyId = `daily-${n.date}`
+    if (seenIds.has(dailyId)) addEdge(edge(id, dailyId, 'date', 0.3))
+    const domainId = TYPE_TO_DOMAIN[nodeType]
+    if (domainId && domainId !== 'hub-xodus') {
+      addEdge(edge(domainId, id, 'semantic', 0.3))
+    }
   }
 
   // ── Nutrition profile ──────────────────────────────────────────────────────
