@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Download, Upload, Trash2, CheckCircle2, AlertTriangle, HardDrive, FileText, RotateCcw, Zap, RefreshCw, Link2 } from 'lucide-react'
+import { Download, Upload, Trash2, CheckCircle2, AlertTriangle, HardDrive, FileText, RotateCcw, Zap, RefreshCw, Link2, Heart } from 'lucide-react'
 import { STORAGE_KEYS, setStorage, resetStorageKey, validateStorageKey, getTodayLog, saveTodayLog, emptyLog, getTodayKey } from '@/lib/storage'
 import { downloadObsidianExport, downloadXodusObsidianExport } from '@/lib/obsidian-export'
 import type { WhoopDailySync } from '@/lib/whoop/types'
@@ -76,11 +76,26 @@ export default function SettingsPage() {
   const [whoopLastSync, setWhoopLastSync] = useState<string | null>(null)
   const [whoopReason, setWhoopReason] = useState<string | null>(null)
   const [whoopSyncing, setWhoopSyncing] = useState(false)
+  const [appleHealth, setAppleHealth] = useState<{ connected: boolean; lastSync: string | null; reason: string | null } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const refreshStats = useCallback(() => {
     setStats(readKeyStats())
     setStorageHealth(BACKUP_MANIFEST.map(({ key }) => validateStorageKey(key)))
+  }, [])
+
+  const fetchAppleHealthStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/integrations/apple-health/sync')
+      const data = await res.json() as { connected: boolean; lastSync?: string | null; reason?: string }
+      setAppleHealth({
+        connected: data.connected,
+        lastSync:  data.lastSync ?? null,
+        reason:    data.reason ?? null,
+      })
+    } catch {
+      setAppleHealth({ connected: false, lastSync: null, reason: 'error' })
+    }
   }, [])
 
   const fetchWhoopStatus = useCallback(async () => {
@@ -108,6 +123,7 @@ export default function SettingsPage() {
 
     refreshStats()
     void fetchWhoopStatus()
+    void fetchAppleHealthStatus()
 
     if (navigator.storage?.estimate) {
       navigator.storage.estimate().then((e) => {
@@ -128,7 +144,7 @@ export default function SettingsPage() {
       else if (whoopParam === 'state_mismatch') toast$('OAuth state mismatch — try connecting again', false)
       else if (whoopParam === 'error') toast$('WHOOP connection failed — check server logs', false)
     }
-  }, [refreshStats, fetchWhoopStatus])
+  }, [refreshStats, fetchWhoopStatus, fetchAppleHealthStatus])
 
   function saveMeta(next: Meta) {
     setMeta(next)
@@ -345,7 +361,7 @@ export default function SettingsPage() {
         <section>
           <p className="section-title mb-3">Integrations</p>
           <div className="rounded-2xl bg-[--surface] border border-white/[0.06] card-elevated overflow-hidden">
-            <div className="flex items-center gap-4 px-5 py-4">
+            <div className="flex items-center gap-4 px-5 py-4 border-b border-white/[0.04]">
               {/* WHOOP status dot */}
               <div className="flex-shrink-0">
                 <div className={`w-2 h-2 rounded-full ${
@@ -399,6 +415,45 @@ export default function SettingsPage() {
                     Connect
                   </a>
                 )}
+              </div>
+            </div>
+
+            {/* Apple Health row — honest planned state, no fake Connect */}
+            <div className="flex items-center gap-4 px-5 py-4">
+              <div className="flex-shrink-0">
+                <div className={`w-2 h-2 rounded-full ${
+                  appleHealth?.connected ? 'bg-green-400' : 'bg-zinc-700'
+                }`} />
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <p className="text-[14px] text-zinc-200 font-medium flex items-center gap-2">
+                  <Heart size={13} className="text-pink-400" strokeWidth={2.5} />
+                  Apple Health
+                </p>
+                <p className="text-[12px] mt-0.5 text-zinc-600 leading-relaxed">
+                  {appleHealth === null
+                    ? 'Checking status…'
+                    : appleHealth.connected
+                      ? `Receiving · Last sync ${fmtRel(appleHealth.lastSync)}`
+                      : appleHealth.reason === 'not_configured'
+                        ? 'Planned — requires iPhone companion app or iOS Shortcut. Fills steps, distance, active energy, workouts.'
+                        : appleHealth.reason === 'table_missing'
+                          ? 'Setup pending — Supabase table not created yet (see docs)'
+                          : 'Not connected — see docs for iOS Shortcut setup'}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <a
+                  href="https://github.com/jpicard604-jp/picard-os/blob/main/docs/apple-health-integration-plan.md"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-zinc-500 text-[13px] font-medium hover:bg-white/[0.08] hover:text-zinc-300 active:scale-[0.98] transition-all"
+                >
+                  <FileText size={13} strokeWidth={2} />
+                  Setup guide
+                </a>
               </div>
             </div>
           </div>
