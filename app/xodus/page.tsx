@@ -184,9 +184,18 @@ export default function XodusPage() {
               XODUS
             </h1>
           </div>
-          <p className="text-[11px] font-mono text-zinc-700 pb-1 hidden lg:block">
-            Tell XODUS what happened. It handles the rest.
-          </p>
+          <div className="flex flex-col items-end gap-2 pb-1">
+            <p className="text-[11px] font-mono text-zinc-700 hidden lg:block">
+              Tell XODUS what happened. It handles the rest.
+            </p>
+            <Link
+              href="/signals"
+              className="flex items-center gap-1 text-[10px] font-mono text-zinc-600 hover:text-sky-300 transition-colors"
+            >
+              <span className="w-1 h-1 rounded-full bg-sky-400" />
+              Signals feed →
+            </Link>
+          </div>
         </div>
       </div>
 
