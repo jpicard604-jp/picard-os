@@ -6,6 +6,7 @@ import { STORAGE_EVENTS } from '@/lib/storage'
 import { gatherBrainInput, runXodusBrain } from '@/lib/xodus/brain'
 import type { XodusBrainOutput } from '@/lib/xodus/brain'
 import CommandInbox from '@/components/xodus/CommandInbox'
+import ChatPanel from '@/components/xodus/ChatPanel'
 
 const URGENCY_COLOR = {
   LOW:      { pill: 'text-cyan-400 bg-cyan-400/10 border-cyan-400/20',      dot: 'bg-cyan-400'   },
@@ -121,7 +122,10 @@ function DailyBriefPanel({ brain }: { brain: XodusBrainOutput }) {
   )
 }
 
+type LeftTab = 'chat' | 'structured'
+
 export default function XodusPage() {
+  const [tab, setTab] = useState<LeftTab>('chat')
   const [brain, setBrain] = useState<XodusBrainOutput>(() =>
     runXodusBrain(gatherBrainInput())
   )
@@ -175,9 +179,31 @@ export default function XodusPage() {
 
       {/* Body */}
       <div className="px-4 lg:px-6 lg:grid lg:grid-cols-[1fr_320px] lg:gap-5 pt-4">
-        {/* Left: Command Inbox */}
+        {/* Left: Chat / Structured tabs */}
         <div>
-          <CommandInbox />
+          <div className="flex items-center gap-1 mb-3 p-1 rounded-xl bg-[--surface] border border-white/[0.06] w-fit">
+            <button
+              onClick={() => setTab('chat')}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-mono uppercase tracking-[0.12em] transition-colors ${
+                tab === 'chat'
+                  ? 'bg-gradient-to-br from-pink-500/20 to-cyan-500/15 text-white border border-cyan-500/25'
+                  : 'text-zinc-600 hover:text-zinc-300'
+              }`}
+            >
+              Chat
+            </button>
+            <button
+              onClick={() => setTab('structured')}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-mono uppercase tracking-[0.12em] transition-colors ${
+                tab === 'structured'
+                  ? 'bg-gradient-to-br from-pink-500/20 to-cyan-500/15 text-white border border-cyan-500/25'
+                  : 'text-zinc-600 hover:text-zinc-300'
+              }`}
+            >
+              Structured
+            </button>
+          </div>
+          {tab === 'chat' ? <ChatPanel /> : <CommandInbox />}
         </div>
 
         {/* Right: Daily Brief */}

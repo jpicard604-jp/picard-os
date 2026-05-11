@@ -78,6 +78,66 @@ OPENAI_API_KEY=<key>      # alternative provider
 - Node filter/search bar
 - Zoom + pan (SVG transform or CSS scale)
 
+---
+
+## [2026-05-10] XODUS Chat MVP — conversational interface + action layer
+
+**Status:** complete
+
+**Ruflo/Rooflow:** checked — no project artifacts. Skipped.
+
+**Plan:**
+- [x] `lib/xodus/notes.ts` — `XodusNote` store (categories incl. grocery), event bus
+- [x] `lib/xodus/chat-types.ts` — chat actions, context, response shapes, readiness types
+- [x] `lib/xodus/readiness.ts` — transparent wellness signal (no diagnosis, lists inputs)
+- [x] `lib/xodus/chat-context.ts` — client-side compact context gatherer
+- [x] `lib/xodus/chat-fallback.ts` — rule-based response + actions (server-safe)
+- [x] `lib/xodus/apply-chat-actions.ts` — client applier for goals/notes/nutrition/food
+- [x] `app/api/xodus/chat/route.ts` — AI provider call with JSON validation + fallback
+- [x] `components/xodus/ChatPanel.tsx` — bubble chat UI, voice input, action chips, readiness pill
+- [x] `app/xodus/page.tsx` — Chat / Structured tab toggle on left column
+- [x] `npm run build` — 0 errors, /api/xodus/chat in route list
+
+**Architecture:**
+- Chat is the new default tab on `/xodus`. Structured (CommandInbox) is one click away. Daily Brief stays on right.
+- Server route is stateless. Context arrives from client each turn → keeps prompt compact (~3-line vitals block, 5 goals max).
+- AI prompt: 1–3 sentence reply + JSON actions. Output budget 500 tokens, temperature 0.3.
+- DeepSeek preferred via existing `lib/ai/provider.ts` auto-select. Falls back to `buildFallbackResponse` when no key, API error, or invalid JSON.
+- Actions auto-apply client-side after server response. Visible as colored chips beneath the assistant message.
+
+**Actions supported:**
+- `create_goal` → `addGoals(date, [...])` (split commas, weekday/tomorrow resolution)
+- `create_note` → `addNote({ category })` — including `grocery` for shopping items
+- `update_nutrition` → `saveNutritionProfile(updates)`
+- `log_food` → patches today's `DailyLog` calories/protein
+- `training_recommendation` → informational only, shown in chip; consumes readiness signal
+
+**Notes / groceries:**
+- `lib/xodus/notes.ts` is the source of truth. Key: `picard_xodus_notes_v1`. Event: `picard:notes-updated`.
+- Grocery items land as `category: "grocery"` notes — feeds Obsidian export later.
+
+**Readiness / wellness signal:**
+- `computeReadiness(ctx)` returns `{ signal: green|amber|red|unknown, inputs[], note }`.
+- Pure derivation from self-reported metrics (recovery, sleep, HRV, strain, mood, goal pressure).
+- Always lists the inputs used. Never medical language. Shown as a pill above the assistant message.
+
+**Voice support:**
+- Browser SpeechRecognition only (no server transcription). Falls back gracefully when unsupported (button hidden).
+- Live interim text shown below input. Final transcript appended to input — user still presses Enter to send.
+
+**Obsidian future hooks:**
+- XodusNote shape already includes `source: 'xodus'` and `date` field → trivial to export as markdown later.
+- /brain `buildBrainGraph()` should ingest notes in a follow-up patch (add `getRecentNotes()` → nodes with `category` → edges to `hub-obsidian`).
+
+**Remaining TODOs (next features, not blockers):**
+- [ ] Connect /brain graph to XODUS notes/actions (ingest `getRecentNotes()` → graph nodes)
+- [ ] Store XODUS chat summaries into Obsidian-formatted markdown export
+- [ ] AI chat history import pipeline (Claude/ChatGPT exports → distilled notes)
+- [ ] Persist chat history across page reloads (localStorage; cap last 50 turns)
+- [ ] Add "Notes" surface — quick view of grocery list + recent notes on `/xodus` or `/brain`
+- [ ] Dashboard card "Open XODUS Chat" if discoverability becomes an issue
+- [ ] Server-side transcription path (Whisper) for non-Chrome mobile
+
 **Next TODOs (do not start yet):**
 1. **Obsidian Neural Link / /brain page** — force-directed graph, node types, vault architecture
 2. **Apple Health / HealthKit for steps** — iOS Shortcut endpoint or XML export parser
