@@ -440,13 +440,13 @@ export default function SettingsPage() {
                         ? 'Planned — requires iPhone companion app or iOS Shortcut. Fills steps, distance, active energy, workouts.'
                         : appleHealth.reason === 'table_missing'
                           ? 'Setup pending — Supabase table not created yet (see docs)'
-                          : 'Not connected — see docs for iOS Shortcut setup'}
+                          : 'Not connected — build the iOS Shortcut using the setup guide'}
                 </p>
               </div>
 
               <div className="flex items-center gap-2 flex-shrink-0">
                 <a
-                  href="https://github.com/jpicard604-jp/picard-os/blob/main/docs/apple-health-integration-plan.md"
+                  href="https://github.com/jpicard604-jp/picard-os/blob/main/docs/apple-health-shortcut-setup.md"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-zinc-500 text-[13px] font-medium hover:bg-white/[0.08] hover:text-zinc-300 active:scale-[0.98] transition-all"
