@@ -4,6 +4,57 @@ This file tracks active and completed tasks. Claude Code updates this file for e
 
 ---
 
+## [2026-05-10] XODUS AI Router MVP — DailyGoals intake with DeepSeek fallback
+
+**Status:** complete
+
+**Ruflo/Rooflow:** checked — no `.roo*` files, no `workflow/` dirs. MCP tools present in session. No project artifacts.
+
+**Plan:**
+- [x] Inspect provider.ts, actions.ts, brain.ts, agent route, DailyGoals.tsx, nutrition-profile.ts
+- [x] Create `lib/xodus/intake.ts` — `XodusIntakeResult` type + `intakeFromRuleParser()` fallback
+- [x] Create `app/api/xodus/intake/route.ts` — POST handler: AI → parse → fallback to rule-based
+- [x] Update `components/dashboard/DailyGoals.tsx` — async submit, loading state, server route, client fallback
+- [x] Fix pre-existing build errors: delete root-level duplicate TS/TSX junk files (33 files untracked)
+- [x] npm run build — zero errors, 21 routes
+
+**AI Router Design:**
+- `lib/ai/provider.ts` handles all provider calls (was already complete)
+- `lib/xodus/intake.ts` defines `XodusIntakeResult` type — separate from heavy `XodusAction[]` system in `actions.ts`
+- `/api/xodus/intake` is lightweight (600 max tokens) vs `/api/agent` (1200 max tokens, full action system)
+- Mock provider falls back to rule-based parser automatically — no AI key required for app to function
+
+**Env vars needed (optional):**
+```
+AI_PROVIDER=deepseek      # or anthropic, openai, mock (default: auto-select by key)
+DEEPSEEK_API_KEY=<key>    # cheapest option — deepseek-chat model
+DEEPSEEK_MODEL=deepseek-chat   # optional override
+ANTHROPIC_API_KEY=<key>   # alternative provider
+OPENAI_API_KEY=<key>      # alternative provider
+```
+
+**Fallback behavior:**
+- No AI key → `intakeFromRuleParser()` runs client-side (parseXodusInput wrapper)
+- AI error/timeout → same client-side fallback
+- Mock provider response doesn't parse as XodusIntakeResult → server falls back to rule-based
+
+**UI behavior:**
+- Input clears immediately on submit
+- Button shows spinner (Loader2) while loading
+- Input shows reduced opacity + "Parsing..." placeholder during load
+- Feedback shows source ("AI" tag when AI was used)
+- Double-submit blocked via `isLoading` guard
+
+**Pre-existing issue fixed:** 33 root-level duplicate `.ts`/`.tsx` files (stale copies of files in `lib/`, `app/`, `components/`) were tracked by git and causing TypeScript errors. Untracked with `git rm --cached -f` and deleted.
+
+**Next TODOs (do not start yet):**
+1. **Obsidian Neural Link / /brain page** — force-directed graph, node types, vault architecture
+2. **Apple Health / HealthKit for steps** — iOS Shortcut endpoint or XML export parser
+3. **AI chat imports into Obsidian vault** — XODUS memory persistence
+4. **Strava** — activity sync (low priority)
+
+---
+
 ## Format
 
 ```
