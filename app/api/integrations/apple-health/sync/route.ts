@@ -171,6 +171,15 @@ async function handleShortcut(body: Record<string, unknown>): Promise<NextRespon
 
 // ─── POST — ingest ────────────────────────────────────────────────────────────
 
+function isShortcutPayload(b: Record<string, unknown>): boolean {
+  // Trim + lowercase so no whitespace or case variation causes a miss.
+  const src = typeof b.source === 'string' ? b.source.trim().toLowerCase() : ''
+  if (src === 'apple_health_shortcut') return true
+  // Also catch payload if raw is present but source is missing (belt+suspenders).
+  if (typeof b.raw === 'string' && b.raw.trim().length > 0 && !b.daily) return true
+  return false
+}
+
 export async function POST(req: NextRequest) {
   if (!authorized(req)) {
     return NextResponse.json(
@@ -197,17 +206,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ synced: false, reason: 'missing_body' }, { status: 400 })
   }
 
-  // Normalize schemaVersion: iOS Shortcuts serialize numbers as strings.
-  // Accept both 1 and "1"; reject anything else downstream.
   const b = body as Record<string, unknown>
-  if ('schemaVersion' in b) b.schemaVersion = Number(b.schemaVersion)
 
-  // ── Shortcut: { source: "apple_health_shortcut", raw: "..." } ────────────────
-  if (b.source === 'apple_health_shortcut') {
+  // ── Shortcut path — checked FIRST, before any schema validation ──────────────
+  // Handles: { source: "apple_health_shortcut", raw: "5676 count Today, 7:17 AM" }
+  // daily is NOT required for shortcut payloads.
+  if (isShortcutPayload(b)) {
     return handleShortcut(b)
   }
 
   // ── Full envelope: { schemaVersion: 1, daily: { ... } } ─────────────────────
+  // Normalize schemaVersion string→number for any non-shortcut envelope payloads.
+  if ('schemaVersion' in b) b.schemaVersion = Number(b.schemaVersion)
+
   const validationError = validateDailySync(body)
   if (validationError) {
     return NextResponse.json(
