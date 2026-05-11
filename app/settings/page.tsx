@@ -437,10 +437,10 @@ export default function SettingsPage() {
                     : appleHealth.connected
                       ? `Receiving · Last sync ${fmtRel(appleHealth.lastSync)}`
                       : appleHealth.reason === 'not_configured'
-                        ? 'Planned — requires iPhone companion app or iOS Shortcut. Fills steps, distance, active energy, workouts.'
+                        ? 'Apple Health sync runs through an iOS Shortcut. Local and production setup both documented.'
                         : appleHealth.reason === 'table_missing'
-                          ? 'Setup pending — Supabase table not created yet (see docs)'
-                          : 'Not connected — build the iOS Shortcut using the setup guide'}
+                          ? 'Setup pending — run the integration_meta SQL in Supabase (see setup guide)'
+                          : 'Not connected — follow the setup guide to build the iOS Shortcut'}
                 </p>
               </div>
 

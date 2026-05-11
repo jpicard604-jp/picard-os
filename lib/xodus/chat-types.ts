@@ -4,6 +4,7 @@
 import type { GoalCategory } from '../daily-goals'
 import type { NutritionProfile } from '../nutrition-profile'
 import type { XodusNoteCategory } from './notes'
+import type { XodusAgentResult } from './action-types'
 
 // ─── Actions returned by the AI ───────────────────────────────────────────────
 
@@ -108,11 +109,14 @@ export interface ReadinessAssessment {
 
 export interface XodusChatResponse {
   message:      string
-  actions?:     XodusChatAction[]
+  actions?:     XodusChatAction[]               // legacy chip-rendering subset
   source:       'ai' | 'rule_based'
   confidence:   number                          // 0.0–1.0
   missingData?: string[]
   readiness?:   ReadinessAssessment
+  // New central agent envelope — populated by routeXodusInput().
+  // Client uses this to apply auto/needs-review actions and surface counts.
+  agent?:       XodusAgentResult
 }
 
 // ─── Local chat message (client state) ────────────────────────────────────────
@@ -125,4 +129,7 @@ export interface ChatMessage {
   actions?:  XodusChatAction[]
   source?:   'ai' | 'rule_based'
   readiness?: ReadinessAssessment
+  agent?:    XodusAgentResult
+  appliedCount?: number
+  pendingCount?: number
 }

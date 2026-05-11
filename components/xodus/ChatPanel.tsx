@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Send, Mic, MicOff, Loader2, Sparkles } from 'lucide-react'
 import { gatherChatContext } from '@/lib/xodus/chat-context'
-import { applyChatActions } from '@/lib/xodus/apply-chat-actions'
+import { applyXodusActionsClient } from '@/lib/xodus/action-applier'
 import type { ChatMessage, XodusChatResponse, XodusChatAction } from '@/lib/xodus/chat-types'
 
 // ─── Speech helper ────────────────────────────────────────────────────────────
@@ -106,6 +106,16 @@ function Bubble({ msg }: { msg: ChatMessage }) {
             {msg.actions.map((a, i) => <ActionChip key={i} action={a} />)}
           </div>
         )}
+        {!isUser && ((msg.appliedCount ?? 0) > 0 || (msg.pendingCount ?? 0) > 0) && (
+          <div className="flex items-center gap-2 px-1 text-[9px] font-mono">
+            {(msg.appliedCount ?? 0) > 0 && (
+              <span className="text-green-400/80">✓ {msg.appliedCount} applied</span>
+            )}
+            {(msg.pendingCount ?? 0) > 0 && (
+              <span className="text-amber-400/80">⏳ {msg.pendingCount} needs review</span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -116,7 +126,7 @@ function Bubble({ msg }: { msg: ChatMessage }) {
 const GREETING: ChatMessage = {
   id:        'greeting',
   role:      'assistant',
-  text:      "I'm here. Talk to me — log food, set goals, ask about today's training, or just think out loud.",
+  text:      "I'm XODUS — your operator inside Picard OS. Tell me what happened: log a workout, add to groceries, set goals, update a project, log nutrition. I'll handle the rest.",
   createdAt: new Date().toISOString(),
 }
 
@@ -221,9 +231,15 @@ export default function ChatPanel() {
       }
     }
 
-    // Apply actions client-side (mutates localStorage)
-    if (response.actions && response.actions.length > 0) {
-      applyChatActions(response.actions)
+    // Apply actions client-side through the central agent applier.
+    // Auto-apply actions go through; needs-review actions become pending notes/chips.
+    let appliedCount = 0
+    let pendingCount = 0
+    if (response.agent) {
+      const autoRes   = applyXodusActionsClient(response.agent.autoApplyActions)
+      const reviewRes = applyXodusActionsClient(response.agent.needsReviewActions)
+      appliedCount = autoRes.applied
+      pendingCount = autoRes.pending + reviewRes.applied + reviewRes.pending + reviewRes.failed
     }
 
     const assistantMsg: ChatMessage = {
@@ -234,6 +250,9 @@ export default function ChatPanel() {
       actions:   response.actions,
       source:    response.source,
       readiness: response.readiness,
+      agent:     response.agent,
+      appliedCount,
+      pendingCount,
     }
     setMessages((prev) => [...prev, assistantMsg])
     setLoading(false)
@@ -290,7 +309,7 @@ export default function ChatPanel() {
             placeholder={
               recording
                 ? 'Listening…'
-                : 'Tell XODUS — train chest tomorrow, add eggs to groceries, how should I train today…'
+                : 'Ask XODUS to update goals, notes, workouts, nutrition, projects…'
             }
             className="flex-1 min-w-0 bg-[#0f0f15] border border-white/[0.08] rounded-xl px-3 py-2 text-[12px] text-white placeholder-zinc-700 focus:outline-none focus:border-cyan-500/40 resize-none leading-snug"
             style={{ maxHeight: 100 }}
@@ -304,7 +323,7 @@ export default function ChatPanel() {
           </button>
         </div>
         <p className="text-[8px] font-mono text-zinc-700 px-1">
-          Enter to send · Shift+Enter for newline · actions apply automatically
+          Enter to send · Shift+Enter for newline · clear actions auto-apply · ambiguous saved for review
         </p>
       </div>
     </div>
