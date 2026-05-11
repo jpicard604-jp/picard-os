@@ -37,6 +37,7 @@ function summarizeContext(ctx: XodusChatContext): string {
     if (log.sleepHours   !== null) bits.push(`sleep ${log.sleepHours}h`)
     if (log.mood         !== null) bits.push(`mood ${log.mood}/5`)
     if (log.weight       !== null) bits.push(`weight ${log.weight}lb`)
+    if (log.steps        !== null) bits.push(`${log.steps.toLocaleString()} steps`)
     if (bits.length) lines.push(`Vitals: ${bits.join(', ')}`)
 
     const nut: string[] = []
@@ -65,6 +66,11 @@ function summarizeContext(ctx: XodusChatContext): string {
 
   if (ctx.recentNotes.length > 0) {
     lines.push(`Recent notes: ${ctx.recentNotes.map(n => `[${n.category}] ${n.body}`).join(' | ')}`)
+  }
+
+  // Honest data gaps — let XODUS respond truthfully when asked about steps etc.
+  if (ctx.missingDataSignals?.includes('steps_apple_health_planned')) {
+    lines.push('Data gap: steps not connected yet (Apple Health integration planned — WHOOP does not expose steps).')
   }
 
   return lines.join('\n')
@@ -99,6 +105,7 @@ Rules:
 - update_nutrition: ONLY when user sets a new target ("set protein to 220", "switching to maintenance"). NEVER for logging what was eaten.
 - log_food: "I ate", "had Xg protein", "Y cal so far" → log_food. NOT update_nutrition.
 - training_recommendation: when user asks training advice OR asks how to train today. Use the recovery/sleep/strain context. If recovery green & sleep good → moderate to high. If recovery <50 → low. If unknown → moderate, mention missing data.
+- Steps & Apple Health: WHOOP does not expose steps. If the context says steps aren't connected and the user asks about steps, daily movement, or step trends, say plainly: "Steps aren't connected yet — Apple Health will unlock that." Do NOT invent step counts.
 - Temporal: "tomorrow" → next day. Weekday name → next instance. No mention → today.
 - Return actions: [] if nothing actionable.
 - confidence: 0.9 clear intent, 0.6 ambiguous, 0.3 mostly chat.

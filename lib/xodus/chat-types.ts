@@ -76,6 +76,7 @@ export interface XodusChatContext {
     calories:      number | null
     weight:        number | null
     mood:          number | null
+    steps:         number | null
   } | null
   nutritionProfile: {
     phase:         string
@@ -88,6 +89,9 @@ export interface XodusChatContext {
   recentActivities:  ChatActivitySummary[]
   recentNotes:       ChatRecentNote[]
   weekActivityCount: number
+  // Honest signals about integrations Picard OS hasn't connected yet.
+  // Values are stable string codes — chat route and readiness consume them.
+  missingDataSignals?: string[]
 }
 
 // ─── Readiness / wellness signal (transparent, no diagnosis) ──────────────────

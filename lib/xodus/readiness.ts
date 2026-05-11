@@ -52,13 +52,18 @@ export function computeReadiness(ctx: XodusChatContext): ReadinessAssessment {
     score -= 1
   }
 
+  const stepsMissing = ctx.missingDataSignals?.includes('steps_apple_health_planned') ?? false
+  const stepsSuffix  = stepsMissing
+    ? ' Steps not connected yet — Apple Health will unlock step trends.'
+    : ''
+
   if (evidence < 2) {
     return {
       signal: 'unknown',
       inputs,
-      note: inputs.length === 0
+      note: (inputs.length === 0
         ? 'Not enough check-in data yet — log recovery, sleep, or mood for a readiness signal.'
-        : 'Based on limited data today.',
+        : 'Based on limited data today.') + stepsSuffix,
     }
   }
 
@@ -68,9 +73,10 @@ export function computeReadiness(ctx: XodusChatContext): ReadinessAssessment {
   else signal = 'red'
 
   const note =
-    signal === 'green' ? 'Body looks ready. Inputs used: ' + inputs.join(', ') + '.'
-    : signal === 'amber' ? 'Mixed signal — moderate today. Inputs used: ' + inputs.join(', ') + '.'
-    : 'Low readiness today. Inputs used: ' + inputs.join(', ') + '.'
+    (signal === 'green' ? 'Body looks ready. Inputs used: ' + inputs.join(', ') + '.'
+     : signal === 'amber' ? 'Mixed signal — moderate today. Inputs used: ' + inputs.join(', ') + '.'
+     : 'Low readiness today. Inputs used: ' + inputs.join(', ') + '.')
+    + stepsSuffix
 
   return { signal, inputs, note }
 }

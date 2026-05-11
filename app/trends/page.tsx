@@ -413,7 +413,7 @@ export default function TrendsPage() {
         ))}
 
         <p className="text-center text-[9px] font-mono text-zinc-800 pb-2">
-          WHOOP sync → Recovery · HRV · RHR · Strain · Sleep · Weight · Manual → Steps
+          WHOOP → Recovery · HRV · RHR · Strain · Sleep · Weight · Apple Health (planned) → Steps · Manual fallback always available
         </p>
       </div>
     </div>

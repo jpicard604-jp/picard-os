@@ -23,6 +23,7 @@ export function gatherChatContext(): XodusChatContext {
       recentActivities: [],
       recentNotes: [],
       weekActivityCount: 0,
+      missingDataSignals: ['steps_apple_health_planned'],
     }
   }
 
@@ -32,6 +33,12 @@ export function gatherChatContext(): XodusChatContext {
   const recent  = getActivityLogs().slice(0, 3)
   const week    = getThisWeekLogs()
   const notes   = getRecentNotes(3)
+
+  const missingDataSignals: string[] = []
+  // Steps must come from Apple Health (WHOOP does not expose steps).
+  if (!log || log.steps === null || log.steps === undefined) {
+    missingDataSignals.push('steps_apple_health_planned')
+  }
 
   return {
     todayDate,
@@ -46,6 +53,7 @@ export function gatherChatContext(): XodusChatContext {
       calories:      log.calories,
       weight:        log.weight,
       mood:          log.mood,
+      steps:         log.steps,
     } : null,
     nutritionProfile: {
       phase:         profile.phase,
@@ -67,5 +75,6 @@ export function gatherChatContext(): XodusChatContext {
       date:     n.date,
     })),
     weekActivityCount: week.length,
+    missingDataSignals,
   }
 }

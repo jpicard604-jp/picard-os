@@ -83,7 +83,7 @@ function WeekSummary({ logs }: { logs: ActivityLog[] }) {
     { label: 'Sessions', value: `${logs.length}`, sub: `${strength} strength` },
     { label: 'Run', value: runDist > 0 ? `${runDist.toFixed(1)}mi` : '—', sub: 'this week' },
     { label: 'Row', value: rowMin > 0 ? `${rowMin}min` : '—', sub: 'this week' },
-    { label: 'Steps', value: totalSteps > 0 ? `${(totalSteps / 1000).toFixed(1)}k` : '—', sub: 'from workouts' },
+    { label: 'Steps', value: totalSteps > 0 ? `${(totalSteps / 1000).toFixed(1)}k` : '—', sub: totalSteps > 0 ? 'workouts only' : 'Apple Health planned' },
   ]
   return (
     <div className="mx-4 mt-3 rounded-2xl bg-[#181818] border border-white/[0.06] p-4 card-elevated">
@@ -713,9 +713,9 @@ export default function FitnessPage() {
           />
           <IntegrationCard
             name="Apple Health"
-            tagline="Export / Shortcut"
-            dataPoints={['Steps', 'Active cal', 'Weight', 'Sleep', 'Workouts']}
-            setupPath="No web API — use iOS Health Export XML or an iOS Shortcut that POSTs daily JSON to /api/health/apple."
+            tagline="Planned — iOS Shortcut / companion app"
+            dataPoints={['Steps', 'Active energy', 'Distance', 'Workouts', 'Resting HR', 'Weight']}
+            setupPath="No web API exists. Planned path: iOS Shortcut (or future Capacitor app) POSTs daily JSON to /api/integrations/apple-health/sync with shared-secret auth. Primary source for steps — WHOOP does not expose steps. See docs/apple-health-integration-plan.md."
             accentClass="text-pink-500/70 border-pink-500/20 bg-pink-500/5"
           />
         </div>
