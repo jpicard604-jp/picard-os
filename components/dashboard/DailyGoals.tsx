@@ -90,7 +90,7 @@ export default function DailyGoals() {
     let result: XodusIntakeResult
 
     try {
-      const res = await fetch('/api/xodus/intake', {
+      const res = await fetch('/api/xodus/parse-goals', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ text: trimmed, date: todayStr }),

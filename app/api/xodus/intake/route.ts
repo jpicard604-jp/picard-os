@@ -1,143 +1,118 @@
-// POST /api/xodus/intake
+// /api/xodus/intake — universal raw intake.
 //
-// Lightweight intake route for the DailyGoals card.
-// Accepts raw user text, returns XodusIntakeResult.
-// Falls back to rule-based parser when AI is unavailable or returns unrecognised JSON.
+// XODUS's nervous system: accept ANY messy input from ANY source, store
+// it raw, return success fast. AI/DeepSeek processing happens later out
+// of band (see lib/xodus/deepseek.ts).
 //
-// Body:  { text: string, date?: string /* YYYY-MM-DD, optional */ }
-// Response: { ok: true, result: XodusIntakeResult }
+// Auth: optional. If XODUS_INTAKE_SECRET is set, require X-XODUS-INTAKE-SECRET
+// header (or Authorization: Bearer <secret>). If not set, open mode for dev.
+//
+// Accepts:
+//   - JSON: { source, message } | { source, text } | { source, raw } | { text } | { raw }
+//   - text/plain body: the message itself
+//
+// Never crashes. Always returns JSON.
 
-import { NextResponse } from 'next/server'
-import { callAI } from '@/lib/ai/provider'
-import { intakeFromRuleParser } from '@/lib/xodus/intake'
-import type { XodusIntakeResult } from '@/lib/xodus/intake'
+import { NextRequest, NextResponse } from 'next/server'
+import { normalizeIntakePayload, storeIntake } from '@/lib/xodus/universal-intake'
+import { isDeepSeekEnabled } from '@/lib/xodus/deepseek'
 
-// ─── System prompt ────────────────────────────────────────────────────────────
-// Kept stable so Anthropic prompt cache can hit on repeat calls.
+const ROUTE_VERSION = 'intake-v1'
 
-const SYSTEM_PROMPT = `You are XODUS, the intake parser for Picard OS — a personal life operating system.
+// ─── Auth ─────────────────────────────────────────────────────────────────────
 
-Parse the user's free-text input and return structured JSON. Return ONLY valid JSON with no markdown fences, no explanation, no extra keys.
+function authorized(req: NextRequest): boolean {
+  const expected = process.env.XODUS_INTAKE_SECRET
+  if (!expected) return true   // open mode when no secret is configured (dev)
 
-Required shape:
-{
-  "summary": "one sentence describing what was extracted",
-  "intent": "daily_planning" | "nutrition_update" | "project_update" | "note" | "task" | "mixed" | "unknown",
-  "targetDate": "YYYY-MM-DD",
-  "goals": [{ "text": "string", "category": "fitness" | "nutrition" | "project" | "school" | "errand" | "personal" | "other" }],
-  "nutritionUpdates": { "calorieTarget"?: number, "proteinTarget"?: number, "carbTarget"?: number, "fatTarget"?: number, "phase"?: "cutting" | "maintenance" | "bulking" } | null,
-  "notes": [{ "title"?: "string", "body": "string", "category"?: "fitness" | "school" | "project" | "car" | "money" | "personal" | "other" }] | null,
-  "projectUpdates": [{ "projectName"?: "string", "update": "string", "nextAction"?: "string" }] | null,
-  "confidence": 0.0,
-  "source": "ai"
+  const headerSecret = req.headers.get('x-xodus-intake-secret')
+  const auth         = req.headers.get('authorization') ?? ''
+  const bearer       = auth.toLowerCase().startsWith('bearer ') ? auth.slice(7).trim() : ''
+
+  return headerSecret === expected || bearer === expected
 }
 
-Goal category rules:
-- fitness: train, gym, run, workout, lift, cardio, yoga, swim, bike, hike, walk, chest, back, legs, shoulders, arms, push, pull, squat, deadlift, bench
-- project: build, ship, code, fix, deploy, write, design, finish, launch, commit, pr, bug, feature
-- school: study, homework, assignment, class, exam, quiz, review, notes, lecture
-- errand: buy, pick up, drop off, call, schedule, book, email, pay, order, grocery, groceries
-- nutrition: eat, calories, protein, carbs, fat, meal, food, diet, macro, macros
-- personal: everything else (default)
+// ─── GET — health ─────────────────────────────────────────────────────────────
 
-Temporal resolution (use today's date from the user message):
-- "tomorrow" → next calendar day
-- day name ("monday"/"tuesday" etc.) → nearest upcoming instance of that weekday
-- no day mentioned → use today's date
+export async function GET() {
+  return NextResponse.json({
+    ok:        true,
+    route:     'xodus intake alive',
+    version:   ROUTE_VERSION,
+    aiEnabled: isDeepSeekEnabled(),
+  })
+}
 
-Rules:
-- goals: split comma-separated items; each distinct task → separate goal entry
-- nutritionUpdates: ONLY if user explicitly sets a new target or changes phase; NOT for logging what was eaten
-- notes: use when input is a reflection or insight, not a to-do list
-- projectUpdates: use when input describes progress on a named project
-- confidence: 1.0 = clear task list; 0.7 = ambiguous; 0.5 = unclear
-- goals must always be an array (use [] if none detected)
-- source must always be "ai"`
+// ─── POST — ingest ────────────────────────────────────────────────────────────
 
-// ─── Response parsing ─────────────────────────────────────────────────────────
+export async function POST(req: NextRequest) {
+  console.log(`[xodus/intake/${ROUTE_VERSION}] POST entered`)
 
-function parseIntakeResult(text: string, today: string): XodusIntakeResult | null {
   try {
-    const cleaned = text.replace(/^```(?:json)?\n?/gm, '').replace(/\n?```$/gm, '').trim()
-    const json = JSON.parse(cleaned) as Record<string, unknown>
-
-    if (typeof json.summary !== 'string') return null
-    if (typeof json.intent  !== 'string') return null
-    if (!Array.isArray(json.goals))       return null
-
-    const targetDate = typeof json.targetDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(json.targetDate)
-      ? json.targetDate
-      : today
-
-    return {
-      summary:    json.summary,
-      intent:     json.intent as XodusIntakeResult['intent'],
-      targetDate,
-      goals: (json.goals as unknown[])
-        .filter((g): g is { text: string; category: string } =>
-          typeof g === 'object' && g !== null &&
-          typeof (g as Record<string, unknown>).text === 'string'
-        )
-        .map(g => ({
-          text:     g.text,
-          category: g.category as XodusIntakeResult['goals'][number]['category'],
-        })),
-      nutritionUpdates:
-        json.nutritionUpdates && typeof json.nutritionUpdates === 'object' && !Array.isArray(json.nutritionUpdates)
-          ? (json.nutritionUpdates as XodusIntakeResult['nutritionUpdates'])
-          : undefined,
-      notes: Array.isArray(json.notes)
-        ? (json.notes as XodusIntakeResult['notes'])
-        : undefined,
-      projectUpdates: Array.isArray(json.projectUpdates)
-        ? (json.projectUpdates as XodusIntakeResult['projectUpdates'])
-        : undefined,
-      confidence: typeof json.confidence === 'number' ? json.confidence : 0.7,
-      source: 'ai',
+    // 1. Auth
+    if (!authorized(req)) {
+      return NextResponse.json(
+        { ok: false, stored: false, reason: 'unauthorized', version: ROUTE_VERSION },
+        { status: 401 },
+      )
     }
-  } catch {
-    return null
-  }
-}
+    if (!process.env.XODUS_INTAKE_SECRET) {
+      console.log(`[xodus/intake/${ROUTE_VERSION}] open mode — no secret configured`)
+    }
 
-// ─── Route handler ────────────────────────────────────────────────────────────
+    // 2. Parse body — accept JSON or plain text
+    const contentType = req.headers.get('content-type')
+    let body: unknown
+    try {
+      if (contentType && contentType.includes('application/json')) {
+        body = await req.json()
+      } else {
+        body = await req.text()
+      }
+    } catch {
+      // Fall back to text on any JSON parse failure
+      try { body = await req.text() } catch { body = '' }
+    }
 
-export async function POST(request: Request) {
-  let text: string
-  let today: string
+    // 3. Normalize
+    const normalized = normalizeIntakePayload(body, contentType)
+    if (!normalized) {
+      return NextResponse.json(
+        { ok: false, stored: false, reason: 'no_message', version: ROUTE_VERSION,
+          note: 'Provide message/text/raw field or plain-text body.' },
+        { status: 400 },
+      )
+    }
 
-  try {
-    const body = (await request.json()) as { text?: unknown; date?: unknown }
-    text  = typeof body.text === 'string' ? body.text.trim() : ''
-    today = typeof body.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.date)
-      ? body.date
-      : new Date().toISOString().slice(0, 10)
-  } catch {
-    return NextResponse.json({ ok: false, error: 'Invalid JSON body' }, { status: 400 })
-  }
+    console.log(`[xodus/intake/${ROUTE_VERSION}] normalized source:"${normalized.source}" len:${normalized.message.length} tags:${normalized.tags.join(',') || 'none'}`)
 
-  if (!text) {
-    return NextResponse.json({ ok: false, error: 'text is required' }, { status: 400 })
-  }
+    // 4. Store (non-blocking failure path — always returns)
+    const store = await storeIntake(normalized)
 
-  // Try AI provider — fall through to rule-based on any failure or unrecognised response shape
-  let result: XodusIntakeResult | null = null
+    if (store.stored) {
+      console.log(`[xodus/intake/${ROUTE_VERSION}] stored id:${store.id}`)
+    } else {
+      console.log(`[xodus/intake/${ROUTE_VERSION}] not stored — reason:${store.reason}`)
+    }
 
-  try {
-    const aiResponse = await callAI({
-      systemPrompt:   SYSTEM_PROMPT,
-      userMessage:    `Today: ${today}\n\nInput: "${text}"`,
-      responseFormat: 'json',
-      maxTokens:      600,
-      temperature:    0.1,
+    // 5. Reply fast — AI processing is deferred
+    return NextResponse.json({
+      ok:             true,
+      stored:         store.stored,
+      reason:         store.stored ? undefined : store.reason,
+      id:             store.id,
+      source:         normalized.source,
+      tags:           normalized.tags,
+      messagePreview: normalized.message.slice(0, 120),
+      processed:      false,
+      version:        ROUTE_VERSION,
     })
 
-    result = parseIntakeResult(aiResponse.text, today)
-  } catch {
-    // AI unavailable — fall through
+  } catch (e) {
+    console.error(`[xodus/intake/${ROUTE_VERSION}] unhandled:`, e)
+    return NextResponse.json(
+      { ok: false, stored: false, reason: 'internal_error', version: ROUTE_VERSION },
+      { status: 500 },
+    )
   }
-
-  const finalResult = result ?? intakeFromRuleParser(text)
-
-  return NextResponse.json({ ok: true, result: finalResult })
 }
