@@ -29,18 +29,12 @@ interface RingDef {
 
 // Derive a 0-100 sleep quality from logged hours when sleepQuality isn't entered
 function sleepHoursToScore(h: number): number {
-  if (h >= 9) return 100
-  if (h >= 8) return 90
-  if (h >= 7.5) return 82
-  if (h >= 7) return 72
-  if (h >= 6) return 58
-  if (h >= 5) return 40
-  return 25
+  return Math.min(100, Math.round((h / 9) * 100))
 }
 
 export default function CommandCenter() {
   const [log, setLog] = useState<DailyLog | null>(null)
-  const [now, setNow] = useState(new Date())
+  const [now, setNow] = useState<Date | null>(null)
 
   function refresh() {
     const todayLog = getTodayLog()
@@ -129,8 +123,8 @@ export default function CommandCenter() {
     },
   ]
 
-  const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
-  const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  const timeStr = now ? now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : ''
+  const dateStr = now ? now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[5fr_7fr] gap-4">

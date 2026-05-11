@@ -42,3 +42,21 @@ next-env.d.ts
 
 .vercel
 .env*.local
+
+# Claude Flow runtime artifacts (written by background daemon every ~10 min)
+.claude-flow/daemon-state.json
+.claude-flow/daemon.pid
+.claude-flow/metrics/
+.claude-flow/security/
+
+# Machine-local Claude Code settings (like .env.local — never commit)
+.claude/settings.local.json
+
+# Swarm runtime database and state
+.swarm/
+
+# Playwright MCP browser session logs
+.playwright-mcp/
+
+# Vector database (runtime data)
+ruvector.db

@@ -12,7 +12,7 @@ import {
   saveVoiceLog,
 } from '@/lib/storage'
 import { addActivityLog } from '@/lib/fitness'
-import { applyProjectUpdate, addProjectTask } from '@/lib/projects'
+import { applyProjectUpdate, addProjectTask, getProjects } from '@/lib/projects'
 import {
   parseCommandInput,
   IMAGE_CATEGORY_LABELS,
@@ -22,6 +22,7 @@ import type { AttachedImage, ImageCategory, ParsedCommand, HistoryEntry } from '
 import type { ParsedDailyFields } from '@/lib/voice-parser'
 import type { DailyLog, VoiceLog } from '@/lib/storage'
 import type { ActivityLog } from '@/lib/fitness'
+import type { AgentResponse, XodusAction } from '@/lib/xodus/actions'
 
 // ─── Speech helper ────────────────────────────────────────────────────────────
 
@@ -456,6 +457,99 @@ function HistoryRow({ entry }: { entry: HistoryEntry }) {
   )
 }
 
+// ─── Agent preview components ─────────────────────────────────────────────────
+
+const AGENT_TYPE_META: Record<string, { label: string; color: string }> = {
+  'daily_log.update':     { label: 'Daily Log',    color: 'text-indigo-400'  },
+  'activity_log.create':  { label: 'Workout',      color: 'text-sky-400'     },
+  'nutrition_log.update': { label: 'Nutrition',    color: 'text-emerald-400' },
+  'project.update':       { label: 'Project',      color: 'text-emerald-400' },
+  'project_task.create':  { label: 'New Task',     color: 'text-amber-400'   },
+  'voice_log.create':     { label: 'Voice Log',    color: 'text-purple-400'  },
+  'brain_note.create':    { label: 'Brain Note',   color: 'text-cyan-400'    },
+  'no_op':                { label: 'No Action',    color: 'text-zinc-500'    },
+  'clarification_needed': { label: 'Needs Info',   color: 'text-amber-400'   },
+}
+
+function AgentActionRow({ action }: { action: XodusAction }) {
+  const meta = AGENT_TYPE_META[action.type] ?? { label: action.type, color: 'text-zinc-400' }
+  const pct  = Math.round(action.confidence * 100)
+
+  // Compact preview of extracted payload fields (top 4, skip verbose string fields)
+  const fieldPairs = Object.entries(action.payload as Record<string, unknown>)
+    .filter(([k, v]) => k !== 'suggestions' && k !== 'partialActions' && v !== null && v !== undefined)
+    .slice(0, 4)
+    .map(([k, v]) => {
+      const label = k.replace(/([A-Z])/g, ' $1').toLowerCase().trim()
+      const val   = Array.isArray(v)
+        ? `[${(v as unknown[]).length}]`
+        : typeof v === 'object'
+        ? '{…}'
+        : String(v).slice(0, 40)
+      return `${label}: ${val}`
+    })
+    .join('  ·  ')
+
+  return (
+    <div className="px-3 py-2.5 border-b border-white/[0.03] last:border-0">
+      <div className="flex items-center gap-2 mb-0.5">
+        <span className={`text-[10px] font-mono font-semibold ${meta.color}`}>{meta.label}</span>
+        <span className="text-[9px] font-mono text-zinc-700">{pct}% confidence</span>
+        {action.requiresConfirmation && (
+          <span className="text-[9px] font-mono text-amber-500/70 ml-auto">review required</span>
+        )}
+      </div>
+      <p className="text-[11px] text-zinc-400 leading-snug">{action.summary}</p>
+      {fieldPairs && (
+        <p className="text-[9px] font-mono text-zinc-700 mt-0.5 truncate">{fieldPairs}</p>
+      )}
+      {action.warnings.length > 0 && (
+        <p className="text-[9px] font-mono text-amber-600/60 mt-0.5 line-clamp-1">
+          ⚠ {action.warnings.join(' · ')}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function AgentPreviewSection({
+  actions, loading, error,
+}: {
+  actions: XodusAction[] | null
+  loading: boolean
+  error: string | null
+}) {
+  if (!loading && !error && (!actions || actions.length === 0)) return null
+
+  return (
+    <div className="mt-1 rounded-xl border border-pink-500/15 bg-pink-500/[0.025] overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-white/[0.04]">
+        <div className="w-1.5 h-1.5 rounded-full bg-pink-400 shadow-[0_0_4px_rgba(236,72,153,0.45)]" />
+        <span className="text-[9px] font-mono uppercase tracking-[0.14em] text-pink-400/80">
+          XODUS AI Preview
+        </span>
+        <span className="text-[9px] font-mono text-zinc-700 ml-auto">preview · not saved</span>
+      </div>
+
+      {loading && (
+        <div className="px-3 py-3">
+          <p className="text-[11px] text-zinc-600 font-mono animate-pulse">Asking XODUS…</p>
+        </div>
+      )}
+
+      {error && !loading && (
+        <div className="px-3 py-2.5">
+          <p className="text-[10px] text-zinc-700 font-mono">{error}</p>
+        </div>
+      )}
+
+      {actions && !loading && actions.map((action, i) => (
+        <AgentActionRow key={i} action={action} />
+      ))}
+    </div>
+  )
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function CommandInbox() {
@@ -487,6 +581,11 @@ export default function CommandInbox() {
 
   // Track individually saved cards to avoid double-save
   const [savedCards, setSavedCards] = useState<Set<string>>(new Set())
+
+  // XODUS AI preview — additive alongside regex parser, actions are NOT auto-applied
+  const [agentActions, setAgentActions] = useState<XodusAction[] | null>(null)
+  const [agentLoading, setAgentLoading] = useState(false)
+  const [agentError, setAgentError]   = useState<string | null>(null)
 
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const activeRef = useRef(false)
@@ -582,10 +681,53 @@ export default function CommandInbox() {
     setImages((prev) => prev.filter((img) => img.id !== id))
   }
 
+  // ── XODUS AI agent (preview-only — does not write to localStorage or Supabase) ─
+
+  async function fetchAgentSuggestions(text: string, source: 'voice' | 'text'): Promise<void> {
+    setAgentLoading(true)
+    setAgentError(null)
+    setAgentActions(null)
+    try {
+      const today    = getTodayLog()
+      const projects = getProjects()
+      const currentContext = {
+        todayDate: new Date().toISOString().slice(0, 10),
+        activeProjects: projects
+          .filter((p) => p.status === 'active')
+          .map((p) => ({ id: p.id, title: p.title, progress: p.progress, priority: p.priority })),
+        currentDailyLog: today ? {
+          calories:      today.calories,
+          protein:       today.protein,
+          sleepHours:    today.sleepHours,
+          recoveryScore: today.recoveryScore,
+        } : undefined,
+        userPreferences: { proteinTarget: 180, calorieTarget: 2500, weeklyWorkoutTarget: 5 },
+      }
+      const res = await fetch('/api/agent', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ userInput: text, source, currentContext }),
+      })
+      if (!res.ok) throw new Error(`Agent responded ${res.status}`)
+      const data = (await res.json()) as AgentResponse
+      if (data.ok) {
+        setAgentActions(data.actions)
+      } else {
+        setAgentError(data.error ?? 'XODUS agent returned an error.')
+      }
+    } catch (e) {
+      console.warn('[CommandInbox] /api/agent failed:', e)
+      setAgentError('XODUS AI preview unavailable — local parser is still active.')
+    } finally {
+      setAgentLoading(false)
+    }
+  }
+
   // ── Analyze ─────────────────────────────────────────────────────────────────
 
   function handleAnalyze() {
-    const text = input.trim()
+    const text     = input.trim()
+    const wasVoice = usedVoiceRef.current
     if (!text && images.length === 0) return
 
     // Persist input as voice log (command history feeds into voice log)
@@ -632,6 +774,9 @@ export default function CommandInbox() {
     setSavedCards(new Set())
     setCardEditing(null)
     usedVoiceRef.current = false
+
+    // Fire XODUS AI preview concurrently — does not block the regex review flow
+    if (text) void fetchAgentSuggestions(text, wasVoice ? 'voice' : 'text')
   }
 
   // ── Individual saves ─────────────────────────────────────────────────────────
@@ -758,6 +903,8 @@ export default function CommandInbox() {
       setInput('')
       setImages([])
       setInterimText('')
+      setAgentActions(null)
+      setAgentError(null)
     }, 2200)
   }
 
@@ -766,6 +913,9 @@ export default function CommandInbox() {
     setPhase('input')
     setParsed(null)
     setCardEditing(null)
+    setAgentActions(null)
+    setAgentError(null)
+    setAgentLoading(false)
   }
 
   function handleCancel() {
@@ -776,6 +926,9 @@ export default function CommandInbox() {
     setImages([])
     setInterimText('')
     setCardEditing(null)
+    setAgentActions(null)
+    setAgentError(null)
+    setAgentLoading(false)
   }
 
   // ── Derived ──────────────────────────────────────────────────────────────────
@@ -892,6 +1045,12 @@ export default function CommandInbox() {
               onRemove={() => removeImage(img.id)}
             />
           ))}
+
+          <AgentPreviewSection
+            actions={agentActions}
+            loading={agentLoading}
+            error={agentError}
+          />
         </div>
       )}
 

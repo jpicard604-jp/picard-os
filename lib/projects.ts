@@ -144,6 +144,7 @@ export function saveProjects(projects: Project[]): void {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(STORAGE_EVENTS.PROJECTS_UPDATED))
   }
+  import('@/lib/supabase/sync').then(({ syncProjects }) => syncProjects(projects))
 }
 
 export function applyProjectUpdate(

@@ -160,6 +160,7 @@ export function addActivityLog(entry: ActivityLog): void {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(STORAGE_EVENTS.ACTIVITY_LOG_UPDATED))
   }
+  import('@/lib/supabase/sync').then(({ syncActivityLog }) => syncActivityLog(entry))
 }
 
 export function getThisWeekLogs(): ActivityLog[] {

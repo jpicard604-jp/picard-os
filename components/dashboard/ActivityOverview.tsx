@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { MiniTrendChart } from '@/components/ui/mini-trend-chart'
 import { STORAGE_EVENTS } from '@/lib/storage'
 import { JACKSON } from '@/lib/mock-data'
@@ -62,7 +63,9 @@ export default function ActivityOverview() {
         <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-zinc-400 font-semibold">
           Weekly Trend Preview
         </p>
-        <span className="text-[9px] font-mono text-zinc-600">Last 7 days</span>
+        <Link href="/trends" className="text-[9px] font-mono text-zinc-600 hover:text-zinc-400 transition-colors">
+          View all →
+        </Link>
       </div>
       <div className="flex gap-5">
         <TrendCard

@@ -521,10 +521,18 @@ interface IntegrationCardProps {
   dataPoints: string[]
   setupPath: string
   accentClass: string
+  connected?: boolean | null
+  connectHref?: string
 }
 
-function IntegrationCard({ name, tagline, dataPoints, setupPath, accentClass }: IntegrationCardProps) {
+function IntegrationCard({ name, tagline, dataPoints, setupPath, accentClass, connected, connectHref }: IntegrationCardProps) {
   const [expanded, setExpanded] = useState(false)
+
+  const statusLabel = connected === true ? 'Connected' : connected === false ? 'Not connected' : 'Checking…'
+  const statusClass = connected === true
+    ? 'text-green-400 border-green-500/30 bg-green-500/5'
+    : 'text-zinc-600 border-zinc-700/40 bg-zinc-800/30'
+
   return (
     <div className="rounded-xl bg-[#181818] border border-white/[0.06] overflow-hidden">
       <div
@@ -536,8 +544,8 @@ function IntegrationCard({ name, tagline, dataPoints, setupPath, accentClass }: 
           <p className="text-[10px] text-zinc-600 font-mono">{tagline}</p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[9px] font-mono px-2 py-0.5 rounded-full border border-zinc-700/40 bg-zinc-800/30 text-zinc-600">
-            Not connected
+          <span className={`text-[9px] font-mono px-2 py-0.5 rounded-full border ${statusClass}`}>
+            {statusLabel}
           </span>
           {expanded ? <ChevronUp size={13} className="text-zinc-600" /> : <ChevronDown size={13} className="text-zinc-600" />}
         </div>
@@ -550,12 +558,21 @@ function IntegrationCard({ name, tagline, dataPoints, setupPath, accentClass }: 
             ))}
           </div>
           <p className="text-[10px] text-zinc-600 font-mono leading-relaxed">{setupPath}</p>
-          <button
-            disabled
-            className="w-full py-2 rounded-xl text-[11px] font-mono text-zinc-600 border border-zinc-800 bg-zinc-900/50 cursor-not-allowed"
-          >
-            Connect — coming soon
-          </button>
+          {connectHref ? (
+            <Link
+              href={connectHref}
+              className="block w-full py-2 rounded-xl text-[11px] font-mono text-center border border-zinc-700 bg-zinc-800/40 text-zinc-300 hover:text-white hover:border-zinc-600 transition-colors"
+            >
+              {connected ? 'Manage in Settings →' : 'Connect in Settings →'}
+            </Link>
+          ) : (
+            <button
+              disabled
+              className="w-full py-2 rounded-xl text-[11px] font-mono text-zinc-600 border border-zinc-800 bg-zinc-900/50 cursor-not-allowed"
+            >
+              Connect — coming soon
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -614,7 +631,7 @@ function RecoveryCard() {
           { label: 'HRV', value: hrv !== null ? `${hrv}ms` : '—', color: 'text-white' },
           { label: 'RHR', value: restingHR !== null ? `${restingHR}` : '—', color: 'text-white' },
           { label: 'Sleep', value: sleepHours !== null ? `${sleepHours}h` : '—', color: 'text-cyan-400' },
-          { label: 'Strain', value: strain !== null ? `${strain}` : '—', color: 'text-purple-400' },
+          { label: 'Strain', value: strain !== null ? strain.toFixed(1) : '—', color: 'text-purple-400' },
         ].map(({ label, value, color }) => (
           <div key={label}>
             <p className="text-[8px] font-mono uppercase tracking-wider text-zinc-700">{label}</p>
@@ -635,6 +652,7 @@ function RecoveryCard() {
 export default function FitnessPage() {
   const [logs, setLogs] = useState<ActivityLog[]>([])
   const [weekLogs, setWeekLogs] = useState<ActivityLog[]>([])
+  const [whoopConnected, setWhoopConnected] = useState<boolean | null>(null)
 
   function reload() {
     setLogs(getActivityLogs())
@@ -644,6 +662,12 @@ export default function FitnessPage() {
   useEffect(() => {
     reload()
     window.addEventListener(STORAGE_EVENTS.ACTIVITY_LOG_UPDATED, reload)
+
+    fetch('/api/integrations/whoop/sync')
+      .then((r) => r.json())
+      .then((d: { connected: boolean }) => setWhoopConnected(d.connected))
+      .catch(() => setWhoopConnected(false))
+
     return () => window.removeEventListener(STORAGE_EVENTS.ACTIVITY_LOG_UPDATED, reload)
   }, [])
 
@@ -675,8 +699,10 @@ export default function FitnessPage() {
             name="WHOOP"
             tagline="OAuth 2.0"
             dataPoints={['Recovery %', 'HRV', 'Resting HR', 'Sleep stages', 'Strain', 'Workouts']}
-            setupPath="Will use WHOOP Developer API. Syncs on app open + hourly background pull. Cached in localStorage."
+            setupPath="WHOOP Developer API v2. Syncs recovery, HRV, sleep, strain, and workouts. Manage connection in Settings."
             accentClass="text-green-500/70 border-green-500/20 bg-green-500/5"
+            connected={whoopConnected}
+            connectHref="/settings"
           />
           <IntegrationCard
             name="Strava"

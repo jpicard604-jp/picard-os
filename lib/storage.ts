@@ -129,6 +129,7 @@ export function saveTodayLog(log: DailyLog): void {
   const all = getStorage<Record<string, DailyLog>>(STORAGE_KEYS.DAILY_LOGS, {})
   setStorage(STORAGE_KEYS.DAILY_LOGS, { ...all, [log.date]: log })
   window.dispatchEvent(new CustomEvent(STORAGE_EVENTS.DAILY_LOG_UPDATED))
+  import('@/lib/supabase/sync').then(({ syncDailyLog }) => syncDailyLog(log))
 }
 
 export function getTodayDateLabel(): string {
@@ -151,6 +152,7 @@ export function saveVoiceLog(log: VoiceLog): void {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(STORAGE_EVENTS.VOICE_LOG_SAVED))
   }
+  import('@/lib/supabase/sync').then(({ syncVoiceLog }) => syncVoiceLog(log))
 }
 
 export function resetStorageKey(key: string): void {

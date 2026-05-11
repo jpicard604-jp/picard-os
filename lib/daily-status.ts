@@ -35,6 +35,9 @@ export interface DailyStatusExtras {
   // Override path for recovery data (e.g. from WHOOP API when connected)
   recoveryScoreOverride?: number
   noDrinkStreakOverride?: number
+  // Nutrition profile overrides (from NutritionProfile when log lacks targets)
+  proteinTargetOverride?: number
+  calorieTargetOverride?: number
 }
 
 export interface DailyStatus {
@@ -56,8 +59,8 @@ export function generateDailyStatus(
   log: DailyLog | null,
   extras: DailyStatusExtras = {}
 ): DailyStatus {
-  const pTarget = log?.proteinTarget ?? 180
-  const cTarget = log?.calorieTarget ?? 2500
+  const pTarget = log?.proteinTarget ?? extras.proteinTargetOverride ?? 210
+  const cTarget = log?.calorieTarget ?? extras.calorieTargetOverride ?? 2200
   const screenTarget = 2
   const noDrinkStreak = extras.noDrinkStreakOverride ?? getAlcoholStreak()
   // Recovery: prefer log entry, then extras override, then null (no data)

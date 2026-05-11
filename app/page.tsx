@@ -5,7 +5,7 @@ import WhatNeedsAttention from '@/components/dashboard/WhatNeedsAttention'
 import TodayTimeline from '@/components/dashboard/TodayTimeline'
 import QuickStats from '@/components/dashboard/QuickStats'
 import ActivityOverview from '@/components/dashboard/ActivityOverview'
-import ProjectSummary from '@/components/dashboard/ProjectSummary'
+import DailyGoals from '@/components/dashboard/DailyGoals'
 import StackPreview from '@/components/dashboard/StackPreview'
 
 export default function DashboardPage() {
@@ -29,6 +29,9 @@ export default function DashboardPage() {
           <div className="animate-in" style={{ animationDelay: '180ms' }}>
             <QuickCapture />
           </div>
+          <div className="animate-in" style={{ animationDelay: '180ms' }}>
+            <DailyGoals />
+          </div>
           <div className="animate-in" style={{ animationDelay: '240ms' }}>
             <WhatNeedsAttention />
           </div>
@@ -41,9 +44,6 @@ export default function DashboardPage() {
           </div>
           <div className="animate-in" style={{ animationDelay: '140ms' }}>
             <TodayTimeline />
-          </div>
-          <div className="animate-in" style={{ animationDelay: '200ms' }}>
-            <ProjectSummary />
           </div>
           <div className="animate-in" style={{ animationDelay: '260ms' }}>
             <StackPreview />

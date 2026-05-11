@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Download, Upload, Trash2, CheckCircle2, AlertTriangle, HardDrive, FileText, RotateCcw } from 'lucide-react'
-import { STORAGE_KEYS, setStorage, resetStorageKey, validateStorageKey } from '@/lib/storage'
+import { Download, Upload, Trash2, CheckCircle2, AlertTriangle, HardDrive, FileText, RotateCcw, Zap, RefreshCw, Link2 } from 'lucide-react'
+import { STORAGE_KEYS, setStorage, resetStorageKey, validateStorageKey, getTodayLog, saveTodayLog, emptyLog, getTodayKey } from '@/lib/storage'
 import { downloadObsidianExport } from '@/lib/obsidian-export'
+import type { WhoopDailySync } from '@/lib/whoop/types'
 
 /* ─── Backup manifest — every key included in export/import/clear ────────────── */
 const BACKUP_MANIFEST = [
@@ -71,11 +72,32 @@ export default function SettingsPage() {
   const [resetConfirm, setResetConfirm] = useState<string | null>(null)
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
   const [storageHealth, setStorageHealth] = useState<Array<{ ok: boolean; error?: string }>>([])
+  const [whoopConnected, setWhoopConnected] = useState<boolean | null>(null)
+  const [whoopLastSync, setWhoopLastSync] = useState<string | null>(null)
+  const [whoopReason, setWhoopReason] = useState<string | null>(null)
+  const [whoopSyncing, setWhoopSyncing] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const refreshStats = useCallback(() => {
     setStats(readKeyStats())
     setStorageHealth(BACKUP_MANIFEST.map(({ key }) => validateStorageKey(key)))
+  }, [])
+
+  const fetchWhoopStatus = useCallback(async () => {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 5000)
+    try {
+      const res = await fetch('/api/integrations/whoop/sync', { signal: controller.signal })
+      clearTimeout(timeout)
+      const data = await res.json() as { connected: boolean; lastSync: string | null; reason?: string }
+      setWhoopConnected(data.connected)
+      setWhoopLastSync(data.lastSync ?? null)
+      setWhoopReason(data.reason ?? null)
+    } catch (err) {
+      clearTimeout(timeout)
+      setWhoopConnected(false)
+      setWhoopReason(err instanceof Error && err.name === 'AbortError' ? 'timeout' : 'error')
+    }
   }, [])
 
   useEffect(() => {
@@ -85,6 +107,7 @@ export default function SettingsPage() {
     } catch {}
 
     refreshStats()
+    void fetchWhoopStatus()
 
     if (navigator.storage?.estimate) {
       navigator.storage.estimate().then((e) => {
@@ -93,7 +116,19 @@ export default function SettingsPage() {
         }
       })
     }
-  }, [refreshStats])
+
+    // Handle WHOOP OAuth redirect params
+    const params = new URLSearchParams(window.location.search)
+    const whoopParam = params.get('whoop')
+    if (whoopParam) {
+      window.history.replaceState({}, '', window.location.pathname)
+      if (whoopParam === 'connected') toast$('WHOOP connected')
+      else if (whoopParam === 'denied') toast$('WHOOP authorization denied', false)
+      else if (whoopParam === 'table_missing') toast$('whoop_tokens table missing — run the SQL in Supabase first', false)
+      else if (whoopParam === 'state_mismatch') toast$('OAuth state mismatch — try connecting again', false)
+      else if (whoopParam === 'error') toast$('WHOOP connection failed — check server logs', false)
+    }
+  }, [refreshStats, fetchWhoopStatus])
 
   function saveMeta(next: Meta) {
     setMeta(next)
@@ -238,6 +273,46 @@ export default function SettingsPage() {
     toast$('All Picard OS data cleared')
   }
 
+  async function handleWhoopSync() {
+    setWhoopSyncing(true)
+    try {
+      const res = await fetch('/api/integrations/whoop/sync', { method: 'POST' })
+      const data = await res.json() as { synced: boolean; dailySync?: WhoopDailySync; workoutsAdded?: number; reason?: string }
+
+      if (!data.synced) {
+        toast$(`Sync failed: ${data.reason ?? 'unknown error'}`, false)
+        return
+      }
+
+      // Apply WHOOP fields to today's localStorage log
+      if (data.dailySync) {
+        const sync = data.dailySync
+        const existing = getTodayLog() ?? emptyLog(getTodayKey())
+        const weightLb = sync.weightKg !== null && sync.weightKg !== undefined
+          ? Math.round(sync.weightKg * 2.20462 * 10) / 10
+          : null
+        saveTodayLog({
+          ...existing,
+          recoveryScore: sync.recoveryScore ?? existing.recoveryScore,
+          hrv: sync.hrv ?? existing.hrv,
+          restingHR: sync.restingHR ?? existing.restingHR,
+          strain: sync.strain ?? existing.strain,
+          sleepHours: sync.sleepHours ?? existing.sleepHours,
+          ...(weightLb !== null ? { weight: weightLb } : {}),
+          savedAt: new Date().toISOString(),
+        })
+      }
+
+      const added = data.workoutsAdded ?? 0
+      toast$(`WHOOP synced${added > 0 ? ` · ${added} workout${added !== 1 ? 's' : ''} added` : ''}`)
+      void fetchWhoopStatus()
+    } catch {
+      toast$('Sync request failed', false)
+    } finally {
+      setWhoopSyncing(false)
+    }
+  }
+
   const totalBytes = stats.reduce((s, k) => s + k.bytes, 0)
 
   return (
@@ -257,6 +332,69 @@ export default function SettingsPage() {
       </div>
 
       <div className="px-4 lg:px-6 pt-6 space-y-5 lg:max-w-2xl">
+
+        {/* ── Integrations ─────────────────────────────────────────────────── */}
+        <section>
+          <p className="section-title mb-3">Integrations</p>
+          <div className="rounded-2xl bg-[--surface] border border-white/[0.06] card-elevated overflow-hidden">
+            <div className="flex items-center gap-4 px-5 py-4">
+              {/* WHOOP status dot */}
+              <div className="flex-shrink-0">
+                <div className={`w-2 h-2 rounded-full ${
+                  whoopConnected === null ? 'bg-zinc-700' :
+                  whoopConnected ? 'bg-green-400' : 'bg-zinc-600'
+                }`} />
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <p className="text-[14px] text-zinc-200 font-medium flex items-center gap-2">
+                  <Zap size={13} className="text-cyan-400" strokeWidth={2.5} />
+                  WHOOP
+                </p>
+                <p className={`text-[12px] mt-0.5 ${
+                  whoopConnected === null ? 'text-zinc-600' :
+                  whoopConnected ? 'text-zinc-600' :
+                  whoopReason === 'table_missing' ? 'text-amber-500/80' :
+                  whoopReason && whoopReason !== 'not_connected' ? 'text-red-400/70' :
+                  'text-zinc-600'
+                }`}>
+                  {whoopConnected === null
+                    ? 'Checking status…'
+                    : whoopConnected
+                      ? `Connected${whoopLastSync ? ` · Last sync ${fmtRel(whoopLastSync)}` : ''}`
+                      : whoopReason === 'table_missing'
+                        ? 'Setup required — create whoop_tokens table in Supabase (see docs § 7)'
+                        : whoopReason === 'db_error'
+                          ? 'Database error — check Supabase credentials in .env.local'
+                          : whoopReason === 'timeout'
+                            ? 'Status check timed out — server may be starting up'
+                            : 'Not connected — recovery, HRV, sleep, and strain auto-fill when connected'}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {whoopConnected ? (
+                  <button
+                    onClick={handleWhoopSync}
+                    disabled={whoopSyncing}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-500/[0.08] border border-cyan-500/20 text-cyan-300 text-[13px] font-medium hover:bg-cyan-500/[0.14] active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none"
+                  >
+                    <RefreshCw size={13} strokeWidth={2} className={whoopSyncing ? 'animate-spin' : ''} />
+                    {whoopSyncing ? 'Syncing…' : 'Sync Now'}
+                  </button>
+                ) : (
+                  <a
+                    href="/api/integrations/whoop/auth"
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/[0.09] text-zinc-300 text-[13px] font-medium hover:bg-white/[0.09] active:scale-[0.98] transition-all"
+                  >
+                    <Link2 size={13} strokeWidth={2} />
+                    Connect
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
 
         {/* ── Backup & Export ──────────────────────────────────────────────── */}
         <section>

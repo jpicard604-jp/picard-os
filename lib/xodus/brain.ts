@@ -7,6 +7,8 @@ import {
   getUploadsToday,
   getAlcoholStreak,
 } from '../storage'
+import { getNutritionProfile, CONFIRMED_NUTRITION_PROFILE } from '../nutrition-profile'
+import type { NutritionProfile } from '../nutrition-profile'
 import type { ActivityLog } from '../fitness'
 import { getThisWeekLogs, getActivityLogs } from '../fitness'
 import type { Project } from '../projects'
@@ -114,6 +116,7 @@ export interface XodusBrainInput {
   voiceLogsToday: number
   uploadsToday: number
   alcoholStreak: number
+  nutritionProfile: NutritionProfile
 }
 
 // ─── Data gathering (client-only) ─────────────────────────────────────────────
@@ -124,6 +127,7 @@ export function gatherBrainInput(): XodusBrainInput {
       dailyLog: null, weekLogs: [], todayLogs: [],
       stackItems: [], projects: [], voiceLogsToday: 0,
       uploadsToday: 0, alcoholStreak: 0,
+      nutritionProfile: CONFIRMED_NUTRITION_PROFILE,
     }
   }
   const todayStr = new Date().toISOString().slice(0, 10)
@@ -137,6 +141,7 @@ export function gatherBrainInput(): XodusBrainInput {
     voiceLogsToday: getVoiceLogsToday().length,
     uploadsToday: getUploadsToday<UploadedFile>().length,
     alcoholStreak: getAlcoholStreak(),
+    nutritionProfile: getNutritionProfile(),
   }
 }
 
@@ -145,7 +150,7 @@ export function gatherBrainInput(): XodusBrainInput {
 export function runXodusBrain(input: XodusBrainInput): XodusBrainOutput {
   const {
     dailyLog: log, weekLogs, todayLogs, stackItems,
-    projects, voiceLogsToday, uploadsToday, alcoholStreak,
+    projects, voiceLogsToday, uploadsToday, alcoholStreak, nutritionProfile,
   } = input
 
   const todayStr = new Date().toISOString().slice(0, 10)
@@ -155,8 +160,8 @@ export function runXodusBrain(input: XodusBrainInput): XodusBrainOutput {
 
   // ── Shared derived values ─────────────────────────────────────────────
   const loggedToday = log !== null
-  const pTarget = log?.proteinTarget ?? 180
-  const cTarget = log?.calorieTarget ?? 2500
+  const pTarget = log?.proteinTarget ?? nutritionProfile.proteinTarget ?? 210
+  const cTarget = log?.calorieTarget ?? nutritionProfile.calorieTarget ?? 2200
   const screenTarget = 2
 
   const stackTaken = stackItems.filter((i) => i.takenToday).length
@@ -176,6 +181,8 @@ export function runXodusBrain(input: XodusBrainInput): XodusBrainOutput {
     activityMinutesToday: activeMinutesToday,
     todayActivityLabel: todayActivity?.label ?? todayActivity?.type,
     todayActivityType: todayActivity?.type,
+    proteinTargetOverride: nutritionProfile.proteinTarget,
+    calorieTargetOverride: nutritionProfile.calorieTarget,
   }
   const status = generateDailyStatus(log, extras)
   const executionScore = status.executionScore

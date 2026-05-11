@@ -92,7 +92,7 @@ export default function FitnessWidget() {
       <div className="flex justify-around">
         <Ring value={score ?? 0} max={100} color={score === null ? 'rgba(255,255,255,0.15)' : '#22c55e'} label="Recovery" unit={score !== null ? '%' : '—'} />
         <Ring value={sleepHours ?? 0} max={9} color={sleepHours === null ? 'rgba(255,255,255,0.15)' : '#22d3ee'} label="Sleep" unit={sleepHours !== null ? 'hr' : '—'} />
-        <Ring value={strain ?? 0} max={21} color={strain === null ? 'rgba(255,255,255,0.15)' : '#a855f7'} label="Strain" unit={strain !== null ? '/21' : '—'} />
+        <Ring value={strain !== null ? Math.round(strain * 10) / 10 : 0} max={21} color={strain === null ? 'rgba(255,255,255,0.15)' : '#a855f7'} label="Strain" unit={strain !== null ? '/21' : '—'} />
       </div>
 
       <div className="grid grid-cols-4 gap-1 mt-5 pt-4 border-t border-white/[0.07]">

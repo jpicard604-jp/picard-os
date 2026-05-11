@@ -6,6 +6,7 @@ import { Zap } from 'lucide-react'
 import { STORAGE_EVENTS } from '@/lib/storage'
 import { gatherBrainInput, runXodusBrain } from '@/lib/xodus/brain'
 import type { XodusBrainOutput, BrainInsight } from '@/lib/xodus/brain'
+import { CONFIRMED_NUTRITION_PROFILE } from '@/lib/nutrition-profile'
 
 const LEVEL_DOT: Record<BrainInsight['level'], string> = {
   critical: 'bg-pink-400 shadow-[0_0_5px_rgba(236,72,153,0.6)]',
@@ -13,6 +14,16 @@ const LEVEL_DOT: Record<BrainInsight['level'], string> = {
   info:     'bg-zinc-500',
   positive: 'bg-cyan-400',
 }
+
+// Stable SSR-safe default: deterministic output with empty inputs.
+// Used as the initial useState value so server and client render identically.
+// useEffect replaces this with real localStorage data after mount.
+const EMPTY_BRAIN: XodusBrainOutput = runXodusBrain({
+  dailyLog: null, weekLogs: [], todayLogs: [],
+  stackItems: [], projects: [], voiceLogsToday: 0,
+  uploadsToday: 0, alcoholStreak: 0,
+  nutritionProfile: CONFIRMED_NUTRITION_PROFILE,
+})
 
 function InsightRow({ insight }: { insight: BrainInsight }) {
   return (
@@ -34,9 +45,7 @@ function InsightRow({ insight }: { insight: BrainInsight }) {
 }
 
 export default function XodusCard() {
-  const [brain, setBrain] = useState<XodusBrainOutput>(() =>
-    runXodusBrain(gatherBrainInput())
-  )
+  const [brain, setBrain] = useState<XodusBrainOutput>(EMPTY_BRAIN)
 
   function refresh() {
     setBrain(runXodusBrain(gatherBrainInput()))

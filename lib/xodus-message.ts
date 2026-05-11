@@ -40,8 +40,8 @@ function buildParagraphs(
   log: DailyLog | null,
   extras?: DailyStatusExtras
 ): string[] {
-  const pTarget = log?.proteinTarget ?? 180
-  const cTarget = log?.calorieTarget ?? 2500
+  const pTarget = log?.proteinTarget ?? 210
+  const cTarget = log?.calorieTarget ?? 2200
   const screenTarget = 2
   const protein = log?.protein ?? null
   const calories = log?.calories ?? null

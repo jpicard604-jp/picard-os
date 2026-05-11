@@ -6,6 +6,135 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ---
 
+# Claude Code Operating Rules for Picard OS / XODUS
+
+## 1. Plan Mode Default
+- Enter plan mode for any non-trivial task involving 3+ steps, architecture decisions, data flow, integrations, UI systems, or bug fixes.
+- Do not jump straight into coding.
+- Write a clear plan first with checkable steps.
+- If the task starts drifting sideways, stop and re-plan instead of pushing blindly.
+- Use plan mode for verification steps, not just implementation.
+
+## 2. Inspect Before Acting
+- Always inspect the current project state before editing.
+- Read relevant files before proposing changes.
+- Do not assume file structure, data shape, localStorage keys, styling conventions, or component architecture.
+- Prefer small, targeted changes based on the existing codebase.
+- Preserve existing functionality unless explicitly replacing it.
+
+## 3. Subagent / Tool Strategy
+- Use subagents or parallel analysis when a task is complex, broad, or research-heavy.
+- Keep the main context clean by offloading exploration when useful.
+- One subtask per subagent: data layer, UI audit, integration audit, bug tracing, build errors, etc.
+- For complex problems, spend more compute on understanding before implementing.
+
+## 4. Integration Awareness
+Before implementing major changes, check whether the project already uses or plans to use:
+- Next.js / React App Router
+- Tailwind
+- localStorage data layer
+- Supabase or future backend schema
+- XODUS brain/context logic
+- Ruflo / Rooflow workflows if present
+- Vue integrations if present
+- UX/UI design software exports, Claude Design references, screenshots, Nano Banana references, or design-system files
+- Existing animation libraries, component libraries, charting libraries, or visual frameworks
+
+Do not add Vue, Ruflo/Rooflow, or any UX/UI framework blindly. First inspect whether they exist or are actually needed. If they are relevant, integrate them cleanly with the existing architecture. If they are not present, document that clearly and avoid unnecessary installs.
+
+## 4a. Ruflo / Rooflow Workflow Integration
+
+For any task involving workflows, automations, UX/UI flows, data flow, design-system implementation, AI agents, XODUS behavior, integrations, or product orchestration:
+
+- Actively inspect whether Ruflo/Rooflow skills, files, prompts, exports, or workflow conventions exist in the project.
+- If Ruflo/Rooflow artifacts exist, use them as part of the planning process before coding.
+- If they do not exist, explicitly state that none were found and continue with the existing architecture.
+- Do not ignore Ruflo/Rooflow when the task touches:
+  - user flows or dashboard systems
+  - XODUS intelligence or AI agent behavior
+  - localStorage/Supabase sync or data-flow design
+  - Claude Design or UX/UI design-tool outputs
+  - automation logic, workflow diagrams, or reusable skills/templates
+- Do not invent a Ruflo/Rooflow architecture if no real files or conventions exist in the repo.
+- Prefer integrating Ruflo/Rooflow cleanly into the existing Next.js / React / Tailwind / XODUS system.
+- If Ruflo/Rooflow conflicts with the current architecture, document the conflict and propose the smallest clean bridge.
+
+## 5. Self-Improvement Loop
+- After any correction from the user, update tasks/lessons.md with a short reusable rule.
+- Write rules that prevent the same mistake from happening again.
+- Review relevant lessons at the start of a session.
+- If the same issue repeats, tighten the workflow instead of making another one-off fix.
+
+## 6. Verification Before Done
+- Never mark work complete without proving it works.
+- Run the relevant checks:
+  - npm run build
+  - npm run lint if available
+  - targeted tests if available
+  - manual route checks where relevant
+- Check logs and errors before summarizing.
+- If build fails, fix the cause instead of hiding it.
+- Compare behavior before and after when relevant.
+- Ask: "Would a staff engineer approve this?"
+
+## 7. Demand Elegance, But Do Not Overengineer
+- For non-trivial changes, pause and ask whether there is a cleaner solution.
+- If a fix feels hacky, rethink it.
+- Use the simplest durable solution.
+- Avoid giant rewrites unless the existing system is truly broken.
+- Keep changes minimal, readable, and easy to reverse.
+
+## 8. Autonomous Bug Fixing
+- When given a bug report, fix it.
+- Do not ask for hand-holding if logs, stack traces, or files provide enough context.
+- Point at failing tests, console errors, hydration mismatches, TypeScript errors, and build errors, then resolve them.
+- If a bug touches browser-only APIs like localStorage, Date, window, or hydration, check SSR safety.
+
+## 9. Task Management
+Maintain project task files:
+- tasks/todo.md: plan, checkable steps, progress, and result summary.
+- tasks/lessons.md: reusable lessons learned from mistakes or user corrections.
+
+For each meaningful task:
+1. Write the plan to tasks/todo.md.
+2. Mark items complete as work progresses.
+3. Add a short review/results section.
+4. Add lessons to tasks/lessons.md when the user corrects direction or when a bug pattern is discovered.
+
+## 10. Core Principles
+- Simplicity first.
+- No laziness.
+- Minimal impact.
+- Preserve working code.
+- Inspect first.
+- Verify before done.
+- Build with the actual Picard OS product vision in mind:
+  - clean premium WHOOP/Oura-like UI
+  - neon blue/black with Miami Vice accents where appropriate
+  - mobile-friendly web app
+  - XODUS as the intelligence layer
+  - localStorage now, Supabase later
+  - dashboard metrics derived from real data
+  - useful functionality over cosmetic redesigns
+
+## 11. End-of-Task Summary Required
+At the end of every task, summarize:
+- Files changed
+- Why changes were made
+- Data/localStorage keys affected
+- Integrations touched or intentionally not touched
+- Verification performed
+- Build/lint/test result
+- Any remaining risks or next steps
+
+- Ruflo/Rooflow checked: yes / no
+- Ruflo/Rooflow artifacts found: (list files/skills, or "none")
+- Ruflo/Rooflow used or intentionally skipped: (one-line reason)
+
+**Important:** Do not run `npm audit fix` or `npm audit fix --force` unless explicitly instructed.
+
+---
+
 # Picard OS — CLAUDE.md
 
 Personal operating system for Jpicky. This is the source of truth for how Claude Code should understand, build, and extend this app.
