@@ -1,4 +1,4 @@
-// Apple Health sync — v5 2026-05-11
+// Apple Health sync — v6 2026-05-11
 // Shortcut payload: { source: "apple_health_shortcut", raw: "5676 count Today, 7:17 AM" }
 // Full envelope:    { schemaVersion: 1, daily: { date, source, syncedAt, steps?, ... } }
 // Auth: X-AH-Secret header must match APPLE_HEALTH_SYNC_SECRET env var.
@@ -11,7 +11,7 @@ import type { AppleHealthSyncEnvelope } from '@/lib/apple-health/types'
 
 const USER_ID = process.env.PICARD_USER_ID ?? '00000000-0000-0000-0000-000000000001'
 const META_KEY = 'apple_health_last_sync'
-const ROUTE_VERSION = 'v5'
+const ROUTE_VERSION = 'v6'
 
 // ─── GET ──────────────────────────────────────────────────────────────────────
 
@@ -57,14 +57,15 @@ export async function POST(req: NextRequest) {
     }
 
     // ── SHORTCUT PATH ─────────────────────────────────────────────────────────
-    // Triggered when source === "apple_health_shortcut" (any case, trimmed).
-    // daily is NOT required. Steps extracted from raw string.
-    const source = typeof body.source === 'string' ? body.source.trim().toLowerCase() : ''
-    const rawField = typeof body.raw === 'string' ? body.raw.trim() : ''
+    // Triggered when source === "apple_health_shortcut" (coerced to string, trimmed, lowercased).
+    // schemaVersion and daily are NOT validated. Steps extracted from raw.
+    // String() coerces any iOS Shortcuts type (Dictionary, etc.) to a string.
+    const source = String(body.source ?? '').trim().toLowerCase()
+    const rawField = String(body.raw ?? '').trim()
 
-    console.log(`[apple-health/${ROUTE_VERSION}] body parsed — source:"${source}" hasRaw:${!!rawField} hasDaily:${!!body.daily}`)
+    console.log(`[apple-health/${ROUTE_VERSION}] body parsed — source:"${source}" rawLen:${rawField.length} hasDaily:${!!body.daily} bodyKeys:${Object.keys(body).join(',')}`)
 
-    if (source === 'apple_health_shortcut' || (rawField && !body.daily)) {
+    if (source === 'apple_health_shortcut' && rawField.length > 0) {
       console.log(`[apple-health/${ROUTE_VERSION}] shortcut branch — parsing raw`)
       // Extract steps from raw field
       const match = rawField.match(/\d+/)
@@ -129,6 +130,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         synced: false, reason: 'validation_failed', error: validErr, version: ROUTE_VERSION,
         note: 'For Shortcut: send { source: "apple_health_shortcut", raw: "5676 count Today, 7:17 AM" }',
+        debug: { sourceParsed: source, rawLen: rawField.length, bodyKeys: Object.keys(body) },
       }, { status: 400 })
     }
 
