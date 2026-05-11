@@ -290,25 +290,13 @@ This is a personal app. Every architectural decision should default to the cheap
 
 ## Integration Rules
 
-### WHOOP
-- **Source:** WHOOP Developer API (OAuth 2.0).
-- **Data pulled:** Recovery score, HRV, resting HR, sleep stages, strain, workouts.
-- **Sync cadence:** On app open + once per hour via background sync.
-- **Storage:** Cache latest values in Supabase. Never store raw WHOOP tokens in client code.
-- **Fallback:** If WHOOP API is unavailable, show last-cached values with a staleness indicator.
+> Full detail: `.claude/skills/picard-os-integrations/SKILL.md`
 
-### MyFitnessPal
-- **Source:** No official public API. Use user-exported CSV or manual log entry as primary path. If a community API wrapper is available and stable, document it clearly before using.
-- **Data pulled:** Daily calorie intake, macro breakdown, food log entries.
-- **Manual path:** User pastes or uploads daily MFP export; XODUS parses and ingests it.
-- **Do not scrape** MyFitnessPal's web interface.
-
-### Apple Health
-- **Source:** Apple Health has no web API. Integration is iOS-only via a companion shortcut or Health export.
-- **Primary path:** User exports Health data (XML) via the iOS Health app; Upload Center ingests and parses it.
-- **Secondary path:** iOS Shortcut that POSTs daily summary JSON to a Picard OS API endpoint (document the shortcut schema clearly).
-- **Data pulled:** Steps, active calories, workouts, weight, sleep (if tracked via Apple).
-- **Do not** build a native iOS app just for Health access. Keep it web-first.
+- **WHOOP:** OAuth 2.0, pull recovery/HRV/sleep/workouts, cache in Supabase, never expose tokens client-side. Pass `recoveryScoreOverride` in `DailyStatusExtras`.
+- **Apple Health:** No web API — XML export via Upload Center or iOS Shortcut POST to API endpoint. No native app.
+- **MyFitnessPal:** No official API — CSV export or manual paste. Never scrape.
+- **Gmail / Calendar:** MCP tools available (deferred). Use only on explicit user instruction.
+- **Rule:** Do not add any integration without reading the skill first.
 
 ---
 
@@ -328,20 +316,29 @@ This is a personal app. Every architectural decision should default to the cheap
 
 ---
 
+## Token Budget
+
+| Task size | Definition | Strategy |
+|-----------|-----------|---------|
+| Small | Single file, obvious fix | Read 1 file, edit, verify with `tsc --noEmit` |
+| Medium | 2–5 files, single feature | Read relevant files only, plan in text, implement, build |
+| Large | Cross-cutting, 5+ files | Plan mode required. Use subagents for exploration. Build verify separately. |
+
+Load skills on-demand — do not dump all skill files into context. Read CLAUDE.md for rules, load a skill only when that domain is explicitly in scope.
+
 ## Module Priorities
 
-Build in this order. Do not skip ahead.
+**Completed:** Foundation, Dashboard, XODUS brief, Voice Log, Upload Center, Projects, Stack.
 
-1. **Foundation** — Layout shell, bottom nav, dark theme, PWA manifest + service worker, Supabase connection.
-2. **Dashboard** — Home screen with fitness widget placeholders, project summary, voice log quick-capture.
-3. **XODUS AI** — Chat interface, streaming responses, system context injection.
-4. **Voice Log** — Record, transcribe, summarize, display log history.
-5. **Upload Center** — File ingestion, metadata storage, text extraction pipeline.
-6. **Fitness / WHOOP** — WHOOP OAuth flow, data sync, metric display, history charts.
-7. **Projects** — Project list, task management, file linking.
-8. **Identity Metrics** — Manual logging, radar chart, history.
-9. **Nutrition / MFP** — Manual log + CSV import path.
-10. **Apple Health** — Export parser + Shortcut endpoint.
+**Next (build in order):**
+1. **WHOOP Integration** — OAuth flow, live data sync, `recoveryScoreOverride` path in extras
+2. **XODUS Chat** — Streaming chat interface, context injection from `gatherBrainInput()`
+3. **Brain / /brain** — Force-directed graph, node types, vault architecture (see obsidian-brain skill)
+4. **Trends** — 7/30-day sparklines across metrics, history charts
+5. **Identity Metrics** — Radar chart, manual logging (cognitive, financial, social, creative, mental)
+6. **Nutrition / MFP** — CSV import path, macro dashboard
+7. **Apple Health** — XML export parser, Shortcut endpoint
+8. **Supabase migration** — Move from localStorage to Supabase (auth + tables)
 
 ---
 
@@ -364,95 +361,30 @@ These modules are **built and working** (localStorage-only, no Supabase yet):
 
 | Route | Status | Notes |
 |-------|--------|-------|
-| `/` | ✅ | Full dashboard: CommandCenter, QuickStats, FitnessWidget, ActivityOverview, XodusCard, TodayTimeline, ProjectSummary, StackPreview |
+| `/` | ✅ | Dashboard: XodusCard, DailyGoals, QuickStats, FitnessWidget, ActivityOverview, TodayTimeline, StackPreview |
 | `/daily` | ✅ | Comprehensive daily log form — all fields, saves to localStorage |
 | `/fitness` | ✅ | Activity log, progressive overload sparklines, log form, integration placeholders |
 | `/projects` | ✅ | Project list with tasks, expand/collapse, localStorage persistence |
 | `/voice` | ✅ | VoiceCapture with parsed training detection, Save as Activity flow |
-| `/xodus` | ✅ | Full XODUS brief generated from generateXodusOutput() |
+| `/xodus` | ✅ | Full XODUS brief from generateXodusOutput() |
 | `/stack` | ✅ | Stack tracker with timing groups |
 | `/uploads` | ✅ | Upload center with FileReader base64 previews |
 | `/log` | ✅ | Simplified log form (backward compat) |
+
+**lib/ additions (2026-05-10):** `nutrition-profile.ts` (cut targets, 210g/2200 cal), `daily-goals.ts` (XODUS NL parser + goal CRUD), `xodus/brain.ts` (context builder).
 
 ---
 
 ## Data Layer
 
-### localStorage Keys (`lib/storage.ts` — `STORAGE_KEYS`)
-| Key | Type | Purpose |
-|-----|------|---------|
-| `picard_daily_logs_v1` | `Record<string, DailyLog>` | Daily log entries keyed by YYYY-MM-DD |
-| `picard_activity_logs_v1` | `ActivityLog[]` | Workout/activity entries (falls back to SEED_ACTIVITIES) |
-| `picard_projects_v1` | `Project[]` | Projects + tasks (falls back to SEED_PROJECTS) |
-| `picard_voice_logs_v1` | `VoiceLog[]` | Voice log transcripts |
-| `picard_uploads_v1` | `UploadedFile[]` | Upload metadata |
-| `picard_stack_v1` | `StackItem[]` | Supplement stack (falls back to JACKSON.stack) |
+> Full detail: `.claude/skills/picard-os-data-layer/SKILL.md`
 
-### CustomEvent Bus (`STORAGE_EVENTS`)
-All reactive dashboard components listen to these events on `window`:
-- `picard:daily-log-updated` — fired by `saveTodayLog()`
-- `picard:activity-log-updated` — fired by `addActivityLog()`
-- `picard:voice-log-saved` — fired after saving a voice log
-- `picard:projects-updated` — fired by `saveProjects()`
-- `picard:stack-updated` — fired when stack state changes
-
-**Pattern:** Every `'use client'` component that reads from storage must also call `refresh()` on the relevant events. See `XodusCard.tsx` for the canonical example.
-
-### Seed Data Pattern
-`getProjects()`, `getActivityLogs()`, `getStorage(key, fallback)` all return seed/mock data when localStorage is empty. Seed data lives in `lib/projects.ts` → `SEED_PROJECTS`, `lib/fitness.ts` → `SEED_ACTIVITIES`, and `lib/mock-data.ts` → `JACKSON`.
-
----
-
-## lib/ Module Map
-
-| Module | Exports | Purpose |
-|--------|---------|---------|
-| `storage.ts` | `STORAGE_KEYS`, `STORAGE_EVENTS`, `DailyLog`, `VoiceLog`, `getStorage`, `setStorage`, `getTodayLog`, `saveTodayLog` | All localStorage primitives and types |
-| `mock-data.ts` | `JACKSON` | Static mock data for WHOOP/nutrition/streaks until real APIs connect |
-| `daily-status.ts` | `generateDailyStatus(log, extras)` | Scoring engine → executionScore, alerts[], strengths[], focuses[] |
-| `xodus-message.ts` | `generateXodusOutput(log, extras)` | Calls generateDailyStatus, builds prose paragraphs for XODUS |
-| `fitness.ts` | `ActivityLog`, `getActivityLogs`, `addActivityLog`, `getThisWeekLogs`, `getTodayActivity`, `suggestNextWeight` | Activity log CRUD + progressive overload logic |
-| `activity-summary.ts` | `getDailyActivitySummary()` | Unified daily view: merged steps, active minutes, weekly stats, balance status |
-| `voice-parser.ts` | `parseTrainingFromVoiceLog(transcript)` | Regex-based extraction of workout/exercise data from voice transcripts |
-| `projects.ts` | `Project`, `Task`, `getProjects`, `saveProjects`, `getOverdueCount`, `daysUntil` | Project + task CRUD |
-
-### Scoring Pipeline
-```
-DailyLog + DailyStatusExtras
-    ↓
-generateDailyStatus()      → executionScore (0–100), alerts[], strengths[], recoveryLevel, disciplineLevel
-    ↓
-generateXodusOutput()      → paragraphs[], urgency, focusRecommendation
-    ↓
-XodusCard / /xodus page    → renders prose brief
-```
-
-`DailyStatusExtras` must be assembled at the call site (client component) and includes: `voiceLogsToday`, `uploadsToday`, `stackTaken`, `stackTotal`, `overdueProjects`, `weeklyWorkouts`, `activityMinutesToday`, `todayActivityLabel`, `todayActivityType`.
-
-### ActivityLog Merge Rule
-`DailyLog.steps` is the authoritative daily step total (user's explicit input). `ActivityLog.steps` are per-workout steps (used as fallback). `getDailyActivitySummary()` enforces this — never sum both naively.
+localStorage primitives in `lib/storage.ts` (`STORAGE_KEYS`, `STORAGE_EVENTS`). Scoring pipeline: `generateDailyStatus()` → `generateXodusOutput()` → rendered brief. All `'use client'` components use `useState(EMPTY_CONSTANT)` + `useEffect` to load real data — never seed from localStorage directly. See `XodusCard.tsx` for the canonical pattern. Nutrition targets: 210g protein / 2200 cal (confirmed cut). `DailyLog.steps` is authoritative — never sum with `ActivityLog.steps`.
 
 ---
 
 ## Component Architecture
 
-### Dashboard composition (`app/page.tsx`)
-```
-GreetingHeader → CommandCenter → QuickActions → WhatNeedsAttention
-→ XodusCard → TodayTimeline → QuickStats → FitnessWidget
-→ ActivityOverview → ProjectSummary → StackPreview
-```
+> Full detail: `.claude/skills/xodus-ui/SKILL.md`
 
-All dashboard cards are in `components/dashboard/`. Each is a self-contained `'use client'` component that manages its own data refresh via storage events.
-
-### Bottom Nav
-5 items hardcoded in `components/BottomNav.tsx`: Home | XODUS | Daily | Projects | Stack.
-`/fitness` is NOT in the nav — accessed via link on FitnessWidget. Add new nav items to `NAV_ITEMS` array in that file.
-
-### Design Tokens (Tailwind)
-- Backgrounds: `bg-[#0a0a0a]` (page), `bg-[#111]` (card), `bg-[#0f0f0f]` (inset)
-- Borders: `border border-white/10` (standard), `border border-white/[0.07]` (subtle)
-- Cards use `card-elevated` utility class (defined in `globals.css`)
-- Glow utilities: `glow-green`, `glow-blue`, `glow-amber`, `glow-red`
-- Label pattern: `text-[9px] font-mono uppercase tracking-widest text-zinc-600`
-- Data value pattern: `text-lg font-mono font-bold text-white`
+Dashboard composition in `app/page.tsx`. All cards in `components/dashboard/` are self-contained `'use client'` components. Bottom nav: `components/BottomNav.tsx`, 5 items (Home | XODUS | Daily | Projects | Stack). Design tokens and glow utilities in `app/globals.css`. Icons: Lucide React only.
