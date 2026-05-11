@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Download, Upload, Trash2, CheckCircle2, AlertTriangle, HardDrive, FileText, RotateCcw, Zap, RefreshCw, Link2 } from 'lucide-react'
 import { STORAGE_KEYS, setStorage, resetStorageKey, validateStorageKey, getTodayLog, saveTodayLog, emptyLog, getTodayKey } from '@/lib/storage'
-import { downloadObsidianExport } from '@/lib/obsidian-export'
+import { downloadObsidianExport, downloadXodusObsidianExport } from '@/lib/obsidian-export'
 import type { WhoopDailySync } from '@/lib/whoop/types'
 
 /* ─── Backup manifest — every key included in export/import/clear ────────────── */
@@ -140,13 +140,21 @@ export default function SettingsPage() {
     setTimeout(() => setToast(null), 3500)
   }
 
-  /* Obsidian export */
   function handleObsidianExport() {
     try {
       downloadObsidianExport()
       toast$('Obsidian Markdown downloaded')
     } catch {
       toast$('Failed to generate export', false)
+    }
+  }
+
+  function handleXodusObsidianExport() {
+    try {
+      downloadXodusObsidianExport()
+      toast$('XODUS Memory & Notes downloaded')
+    } catch {
+      toast$('Failed to generate XODUS export', false)
     }
   }
 
@@ -441,8 +449,8 @@ export default function SettingsPage() {
               />
             </div>
 
-            {/* Obsidian export */}
-            <div className="flex items-center gap-4 px-5 py-4">
+            {/* Obsidian export — all logs */}
+            <div className="flex items-center gap-4 px-5 py-4 border-b border-white/[0.04]">
               <div className="flex-1 min-w-0">
                 <p className="text-[14px] text-zinc-200 font-medium">Export Obsidian Markdown</p>
                 <p className="text-[12px] text-zinc-600 mt-0.5 leading-relaxed">
@@ -452,6 +460,23 @@ export default function SettingsPage() {
               <button
                 onClick={handleObsidianExport}
                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-500/[0.08] border border-cyan-500/20 text-cyan-300 text-[13px] font-medium hover:bg-cyan-500/[0.14] active:scale-[0.98] transition-all flex-shrink-0"
+              >
+                <FileText size={14} strokeWidth={2} />
+                Export .md
+              </button>
+            </div>
+
+            {/* XODUS Memory + Notes export */}
+            <div className="flex items-center gap-4 px-5 py-4">
+              <div className="flex-1 min-w-0">
+                <p className="text-[14px] text-zinc-200 font-medium">Export XODUS Memory & Notes</p>
+                <p className="text-[12px] text-zinc-600 mt-0.5 leading-relaxed">
+                  Memory records, notes, groceries, and daily goals — with Obsidian wiki-links
+                </p>
+              </div>
+              <button
+                onClick={handleXodusObsidianExport}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-500/[0.08] border border-violet-500/20 text-violet-300 text-[13px] font-medium hover:bg-violet-500/[0.14] active:scale-[0.98] transition-all flex-shrink-0"
               >
                 <FileText size={14} strokeWidth={2} />
                 Export .md

@@ -1,5 +1,9 @@
 import { getStorage, STORAGE_KEYS } from './storage'
 import { getProjects } from './projects'
+import { getAllNotes } from './xodus/notes'
+import { getTodayGoals } from './daily-goals'
+import { getNutritionProfile } from './nutrition-profile'
+import { getXodusMemoryRecords } from './xodus/memory'
 import type { DailyLog, VoiceLog } from './storage'
 import type { ActivityLog } from './fitness'
 import type { HistoryEntry } from './command-parser'
@@ -162,6 +166,225 @@ export function downloadObsidianExport(): void {
   const a = document.createElement('a')
   a.href = url
   a.download = `picard-os-obsidian-${date}.md`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+// ── XODUS Memory + Notes Obsidian Export ──────────────────────────────────────
+//
+// Generates a single Obsidian-ready markdown file combining:
+//   XODUS/Memory/*   — curated memory records (identity, goals, fitness, etc.)
+//   XODUS/Notes/*    — general XODUS notes by date
+//   XODUS/Groceries/ — grocery checklist notes by date
+//   XODUS/Daily/     — today's goals and nutrition profile
+//
+// Folder paths are shown as H2 headings; each document as H3.
+// Wiki-links reference Obsidian notes by their canonical names.
+//
+// TODO (future):
+//   - ZIP export: one file per document in the proper folder structure
+//   - Supabase memory records: pull from db instead of static module
+//   - Two-way vault sync: watch vault folder, merge changes back to localStorage
+//   - AI chat import distillation: convert ChatGPT/Claude/Gemini history → memory
+//   - Review/approve queue: XODUS flags unvetted memory nodes for confirmation
+
+// Maps brain-graph hub IDs → Obsidian wiki-link page names
+const HUB_TO_WIKILINK: Record<string, string> = {
+  'picard-os':       '[[Picard OS]]',
+  'hub-xodus':       '[[XODUS]]',
+  'hub-fitness':     '[[Fitness]]',
+  'hub-whoop':       '[[WHOOP]]',
+  'hub-nutrition':   '[[Nutrition]]',
+  'hub-projects':    '[[Projects]]',
+  'hub-daily-goals': '[[Daily Goals]]',
+  'hub-daily':       '[[Daily Log]]',
+  'hub-obsidian':    '[[Obsidian Brain]]',
+}
+
+const NOTE_CAT_TO_WIKILINKS: Record<string, string[]> = {
+  grocery:  ['[[Nutrition]]', '[[Groceries]]'],
+  fitness:  ['[[Fitness]]', '[[XODUS]]'],
+  project:  ['[[Projects]]', '[[XODUS]]'],
+  school:   ['[[Daily Goals]]', '[[XODUS]]'],
+  personal: ['[[XODUS]]'],
+  car:      ['[[Porsche 981]]', '[[XODUS]]'],
+  money:    ['[[XODUS]]'],
+  other:    ['[[XODUS]]'],
+}
+
+function fmtDate(iso: string): string {
+  return new Date(iso + (iso.length === 10 ? 'T12:00:00' : '')).toLocaleDateString('en-US', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  })
+}
+
+export function generateXodusObsidianExport(): string {
+  const lines: string[] = []
+  const now = new Date()
+  const today = now.toISOString().slice(0, 10)
+
+  lines.push(
+    '# XODUS Memory & Notes',
+    '',
+    `*Exported ${now.toLocaleDateString('en-US', { dateStyle: 'full' })} at ${now.toLocaleTimeString('en-US', { timeStyle: 'short' })}*`,
+    '',
+    '> Part of [[Picard OS]] · [[XODUS]] · [[Obsidian Brain]]',
+    '',
+    '---',
+    '',
+  )
+
+  // ── XODUS/Memory ────────────────────────────────────────────────────────────
+  lines.push('## XODUS/Memory', '')
+
+  const memoryRecords = getXodusMemoryRecords()
+  for (const rec of memoryRecords) {
+    const wikiLinks = (rec.graphLinks ?? [])
+      .map(id => HUB_TO_WIKILINK[id])
+      .filter(Boolean)
+    const relStr = [
+      ...(rec.relatedProjects ?? []).map(p => `[[${p}]]`),
+      ...(rec.relatedGoals ?? []),
+      ...(rec.relatedPeople ?? []),
+    ]
+
+    lines.push(
+      `### ${rec.title}`,
+      '',
+      '```yaml',
+      `category:   ${rec.category.replace(/_/g, ' ')}`,
+      `status:     ${rec.status.replace(/_/g, ' ')}`,
+      `confidence: ${rec.confidence}`,
+      `source:     ${rec.source.replace(/_/g, ' ')}`,
+      `updated:    ${rec.updatedAt ?? today}`,
+      ...(rec.filePath ? [`file:       ${rec.filePath}`] : []),
+      '```',
+      '',
+      rec.summary,
+      '',
+    )
+
+    if (relStr.length > 0) {
+      lines.push(`**Related:** ${relStr.join(' · ')}`, '')
+    }
+    if (wikiLinks.length > 0) {
+      lines.push(`**Links:** ${wikiLinks.join(' · ')}`, '')
+    }
+    lines.push('---', '')
+  }
+
+  // ── XODUS/Notes ─────────────────────────────────────────────────────────────
+  const allNotes = getAllNotes()
+  const generalNotes = allNotes.filter(n => n.category !== 'grocery')
+  const groceryNotes = allNotes.filter(n => n.category === 'grocery')
+
+  if (generalNotes.length > 0) {
+    lines.push('## XODUS/Notes', '')
+
+    // Group by date
+    const byDate: Record<string, typeof generalNotes> = {}
+    for (const n of generalNotes) {
+      byDate[n.date] = byDate[n.date] ?? []
+      byDate[n.date].push(n)
+    }
+
+    for (const date of Object.keys(byDate).sort().reverse()) {
+      lines.push(`### XODUS/Notes/${date}.md`, '', `> ${fmtDate(date)}`, '')
+      for (const n of byDate[date]) {
+        const wikiLinks = NOTE_CAT_TO_WIKILINKS[n.category] ?? ['[[XODUS]]']
+        lines.push(
+          `#### ${n.title ?? n.category.charAt(0).toUpperCase() + n.category.slice(1)}`,
+          '',
+          '```yaml',
+          `category:  ${n.category}`,
+          `source:    ${n.source}`,
+          `created:   ${n.createdAt}`,
+          ...(n.status ? [`status:    ${n.status}`] : []),
+          '```',
+          '',
+          n.body,
+          '',
+          `*Links: ${wikiLinks.join(' · ')}*`,
+          '',
+        )
+      }
+      lines.push('---', '')
+    }
+  }
+
+  // ── XODUS/Groceries ──────────────────────────────────────────────────────────
+  if (groceryNotes.length > 0) {
+    lines.push('## XODUS/Groceries', '')
+
+    const byDate: Record<string, typeof groceryNotes> = {}
+    for (const n of groceryNotes) {
+      byDate[n.date] = byDate[n.date] ?? []
+      byDate[n.date].push(n)
+    }
+
+    for (const date of Object.keys(byDate).sort().reverse()) {
+      lines.push(`### XODUS/Groceries/${date}.md`, '', `> ${fmtDate(date)}`, '')
+      for (const n of byDate[date]) {
+        const checked = n.status === 'done' ? '[x]' : '[ ]'
+        lines.push(`- ${checked} ${n.body}`)
+      }
+      lines.push(
+        '',
+        '*Links: [[Nutrition]] · [[Groceries]] · [[XODUS]]*',
+        '',
+        '---',
+        '',
+      )
+    }
+  }
+
+  // ── XODUS/Daily ──────────────────────────────────────────────────────────────
+  lines.push('## XODUS/Daily', '', `### XODUS/Daily/${today}.md`, '', `> ${fmtDate(today)}`, '')
+
+  const goals = getTodayGoals()
+  if (goals.length > 0) {
+    lines.push('#### Daily Goals', '')
+    for (const g of goals) {
+      lines.push(`- [${g.done ? 'x' : ' '}] ${g.text} *(${g.category})*`)
+    }
+    lines.push('')
+  }
+
+  const profile = getNutritionProfile()
+  if (profile.proteinTarget || profile.calorieTarget) {
+    lines.push(
+      '#### Nutrition Profile',
+      '',
+      '```yaml',
+      `phase:    ${profile.phase ?? 'cut'}`,
+      `calories: ${profile.calorieTarget ?? '?'} kcal`,
+      `protein:  ${profile.proteinTarget ?? '?'} g`,
+      `carbs:    ${profile.carbTarget ?? '?'} g`,
+      `fat:      ${profile.fatTarget ?? '?'} g`,
+      '```',
+      '',
+      '*Links: [[Nutrition]] · [[Fitness]] · [[WHOOP]] · [[XODUS]]*',
+      '',
+    )
+  }
+
+  if (goals.length === 0 && !profile.proteinTarget && !profile.calorieTarget) {
+    lines.push('*No goals or nutrition data for today.*', '')
+  }
+
+  return lines.join('\n')
+}
+
+export function downloadXodusObsidianExport(): void {
+  const md = generateXodusObsidianExport()
+  const date = new Date().toISOString().slice(0, 10)
+  const blob = new Blob([md], { type: 'text/markdown; charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `xodus-memory-notes-${date}.md`
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
