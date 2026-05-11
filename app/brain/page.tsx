@@ -7,17 +7,8 @@ export const metadata = {
 
 export default function BrainPage() {
   return (
-    <div className="min-h-screen bg-[#07070a] px-4 pt-6 pb-24 lg:pl-64 lg:pr-8 lg:pt-8">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div>
-          <h1 className="text-[22px] font-mono font-semibold text-white tracking-tight">
-            Obsidian Neural Link
-          </h1>
-          <p className="text-[11px] font-mono text-zinc-600 mt-1">
-            Knowledge graph · Picard OS data layer
-          </p>
-        </div>
-
+    <div className="h-full w-full flex flex-col bg-[#050509]">
+      <div className="flex-1 min-h-0 pb-16 lg:pb-0">
         <BrainGraphLoader />
       </div>
     </div>

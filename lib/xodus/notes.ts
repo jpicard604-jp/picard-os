@@ -13,6 +13,7 @@ export interface XodusNote {
   date:      string                       // YYYY-MM-DD — the day the note refers to
   source:    'xodus' | 'manual' | 'imported'
   createdAt: string                       // ISO timestamp
+  status?:   'open' | 'done'             // grocery checklist state
 }
 
 const KEY = 'picard_xodus_notes_v1'
@@ -72,4 +73,8 @@ export function addNotes(notes: Omit<XodusNote, 'id' | 'createdAt'>[]): XodusNot
 
 export function deleteNote(id: string): void {
   saveAll(loadAll().filter(n => n.id !== id))
+}
+
+export function updateNoteStatus(id: string, status: 'open' | 'done'): void {
+  saveAll(loadAll().map(n => n.id === id ? { ...n, status } : n))
 }

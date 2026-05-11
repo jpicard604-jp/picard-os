@@ -4,6 +4,48 @@ This file tracks active and completed tasks. Claude Code updates this file for e
 
 ---
 
+## [2026-05-10] Neural Link force-directed upgrade + trends tooltip fix
+
+**Status:** complete
+
+**Ruflo/Rooflow:** checked — no project artifacts. Skipped.
+
+**Diagnosis:** Old `/brain` was static SVG positioned by trig in `computeLayout()`. No physics, no zoom/pan/drag, no hover-fade, no animation. Looked like a graph; behaved like a poster.
+
+**Library chosen:** `d3-force` (3.x) + `@types/d3-force`. Single small dep (~20kb gz). Kept SVG rendering (preserves Tailwind/color tokens, glow, motion classes). Implemented zoom/pan/drag manually with pointer events.
+
+**Files changed:**
+- `components/brain/BrainGraph.tsx` — full rewrite (force sim, zoom/pan, node drag, hover-fade, domain filter chips, reset, side panel with connected-nodes list)
+- `app/globals.css` — added `brain-pulse` keyframe (hub breathing ring)
+- `app/brain/page.tsx` — widened max-w-4xl → max-w-6xl
+- `app/trends/page.tsx` — `DarkTooltip` now labels "Day" vs "7-day avg", shows source tag, sorts daily-before-average
+- `package.json` — added `d3-force`, `@types/d3-force`
+
+**Interactions implemented:** zoom (wheel), pan (drag background), drag node (pointer), hover (fade unrelated, brighten connected edges), click select (persistent), side panel with connected nodes list, domain filter chips, reset/recenter, hub breathing animation, edge opacity by type weight.
+
+**Build:** ✓ pass (25 routes).
+
+---
+
+## Top-5 interaction upgrades (deferred to next passes)
+
+1. **Card hover lift** across dashboard — subtle 1px translate-y + border brighten on `bg-[#111]` cards; use existing `transition-all duration-150`.
+2. **Page transitions** — `framer-motion` (already installed) `AnimatePresence` on route changes for fade + 4px slide.
+3. **Active feedback on buttons** — replace flat hover with `active:scale-[0.98] active:bg-white/[0.06]` on all `.field` and CTA buttons.
+4. **Chart hover sync** — when hovering the Recovery chart, broadcast the date so HRV/Strain/Sleep charts highlight the same day. Recharts supports this via `<Tooltip>` on a shared payload.
+5. **XODUS chat — streaming + typing indicator** — replace `loading` spinner with token-by-token streaming via `ReadableStream`; add 3-dot typing animation while waiting.
+
+## Neural Link follow-ups (deferred)
+
+- Mobile pinch-zoom (current scroll-wheel zoom doesn't translate to touch). Add `d3-zoom` or manual two-finger gesture handler.
+- Search box (Cmd+K) to focus a node by label.
+- "Time travel" — slider that re-runs `buildBrainGraph()` for a date in the past.
+- Save node positions across sessions in `localStorage` so the layout doesn't reshuffle on reload.
+- Edge type → distinct line style (dashed for `semantic`, solid for `core`, dotted for `date`).
+- Persisted `design-references/` folder: drop Obsidian gif, WHOOP screenshots, etc., with a one-line spec each.
+
+---
+
 ## [2026-05-10] XODUS AI Router MVP — DailyGoals intake with DeepSeek fallback
 
 **Status:** complete

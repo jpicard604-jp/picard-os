@@ -22,6 +22,16 @@ Reusable rules distilled from mistakes or user corrections. Claude Code reviews 
 **Why:** Ruflo/Rooflow is the designated workflow/orchestration layer for Picard OS. Silently skipping the check leads to architectural drift where automation logic gets scattered into ad-hoc code instead of a consistent layer.
 **Apply when:** Any task touching user flows, dashboard systems, XODUS, localStorage/Supabase sync, design-system outputs, automation, or reusable skill templates. Always include the three Ruflo/Rooflow lines in the end-of-task summary.
 
+### [2026-05-10] Graphs must be physical, not decorative
+**Rule:** When a feature is described as a "neural graph", "knowledge graph", or "Obsidian graph", do not ship a statically-positioned SVG layout. Use a real physics simulation (`d3-force` minimum) and ensure: zoom/pan, node drag, hover-fade, selected-node side panel with connected nodes.
+**Why:** First /brain build used radial trig and looked correct on screenshots but had zero interaction or motion — failed the product test the moment the user opened it.
+**Apply when:** Any task touching the `/brain` route or any future "map/graph/network" surface. Run the interaction checklist before claiming done: zoom · pan · drag · hover-fade · select · connected list · reset · mobile pointer.
+
+### [2026-05-10] Capture design references before re-skinning
+**Rule:** Before any design-system upgrade, drop the reference images / gifs the user provides into `design-references/` (or note their absolute path in `tasks/todo.md`) and translate each into a concrete spec line ("hub breathes at ~3s", "unrelated nodes fade to 0.18", "edge opacity doubles on focus") before writing code.
+**Why:** Without an explicit translation, references stay vibes; implementation drifts back into whatever feels "premium" in the abstract.
+**Apply when:** Any task that mentions Obsidian, WHOOP, Linear, Notion, 21st.dev, Nano Banana, Claude Design, or attaches screenshots/gifs.
+
 ### [2026-05-10] Do not run npm audit fix without explicit instruction
 **Rule:** Never run `npm audit fix` or `npm audit fix --force` unless the user explicitly asks.
 **Why:** Automatic dependency upgrades can introduce breaking changes in a Next.js + Tailwind v4 project.

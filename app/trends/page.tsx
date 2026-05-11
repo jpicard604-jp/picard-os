@@ -46,26 +46,60 @@ function DarkTooltip({
   payload,
   label,
   fmt,
+  sourceTag,
 }: {
   active?: boolean
   payload?: TooltipPayloadItem[]
   label?: string
   fmt?: (v: number) => string
+  sourceTag?: 'WHOOP' | 'Manual' | 'Mixed' | null
 }) {
   if (!active || !payload?.length) return null
   const items = payload.filter(p => p.value !== null && p.value !== undefined)
   if (!items.length) return null
+
+  // Sort: daily series before rolling-avg series
+  const ordered = [...items].sort((a, b) => {
+    const aAvg = a.dataKey?.startsWith('avg') ? 1 : 0
+    const bAvg = b.dataKey?.startsWith('avg') ? 1 : 0
+    return aAvg - bAvg
+  })
+
+  function rowLabel(key: string): string {
+    return key.startsWith('avg7') ? '7-day avg' : 'Day'
+  }
+
+  function format(v: unknown): string {
+    if (typeof v !== 'number') return '—'
+    if (fmt) return fmt(v)
+    return Number.isInteger(v) ? v.toLocaleString() : v.toFixed(1)
+  }
+
   return (
-    <div className="bg-[#161616] border border-white/10 rounded-xl px-3 py-2 shadow-2xl text-left min-w-[80px]">
-      <p className="text-[8px] font-mono uppercase tracking-wider text-zinc-600 mb-1.5">{label}</p>
-      {items.map(p => (
-        <p key={p.dataKey} className="text-[11px] font-mono font-semibold leading-relaxed" style={{ color: p.color }}>
-          {typeof p.value === 'number'
-            ? fmt
-              ? fmt(p.value)
-              : Number.isInteger(p.value) ? p.value.toLocaleString() : p.value.toFixed(1)
-            : '—'}
-        </p>
+    <div className="bg-[#161616] border border-white/10 rounded-xl px-3 py-2 shadow-2xl text-left min-w-[120px]">
+      <div className="flex items-center justify-between gap-3 mb-1.5">
+        <p className="text-[8px] font-mono uppercase tracking-wider text-zinc-500">{label}</p>
+        {sourceTag && (
+          <span
+            className={`text-[8px] font-mono ${
+              sourceTag === 'WHOOP' ? 'text-cyan-500'
+              : sourceTag === 'Mixed' ? 'text-zinc-500'
+              : 'text-zinc-600'
+            }`}
+          >
+            {sourceTag}
+          </span>
+        )}
+      </div>
+      {ordered.map(p => (
+        <div key={p.dataKey} className="flex items-baseline justify-between gap-3 leading-tight py-0.5">
+          <span className="text-[9px] font-mono uppercase tracking-wider text-zinc-600">
+            {rowLabel(p.dataKey)}
+          </span>
+          <span className="text-[11px] font-mono font-semibold" style={{ color: p.color, opacity: p.dataKey.startsWith('avg') ? 0.7 : 1 }}>
+            {format(p.value)}
+          </span>
+        </div>
       ))}
     </div>
   )
@@ -163,7 +197,7 @@ function ChartCard({
                   domain={domain}
                   allowDecimals={false}
                 />
-                <Tooltip content={<DarkTooltip fmt={tooltipFmt} />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+                <Tooltip content={<DarkTooltip fmt={tooltipFmt} sourceTag={sourceTag} />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
                 <Bar dataKey={dataKey} fill={color} radius={[3, 3, 0, 0]} opacity={0.85} />
               </BarChart>
             ) : (
@@ -183,7 +217,7 @@ function ChartCard({
                   domain={domain}
                   tickFormatter={yTickFmt}
                 />
-                <Tooltip content={<DarkTooltip fmt={tooltipFmt} />} />
+                <Tooltip content={<DarkTooltip fmt={tooltipFmt} sourceTag={sourceTag} />} />
                 {avgKey && (
                   <Line
                     type="monotone"

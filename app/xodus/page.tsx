@@ -7,6 +7,7 @@ import { gatherBrainInput, runXodusBrain } from '@/lib/xodus/brain'
 import type { XodusBrainOutput } from '@/lib/xodus/brain'
 import CommandInbox from '@/components/xodus/CommandInbox'
 import ChatPanel from '@/components/xodus/ChatPanel'
+import NotesPanel from '@/components/xodus/NotesPanel'
 
 const URGENCY_COLOR = {
   LOW:      { pill: 'text-cyan-400 bg-cyan-400/10 border-cyan-400/20',      dot: 'bg-cyan-400'   },
@@ -178,7 +179,7 @@ export default function XodusPage() {
       </div>
 
       {/* Body */}
-      <div className="px-4 lg:px-6 lg:grid lg:grid-cols-[1fr_320px] lg:gap-5 pt-4">
+      <div className="px-4 lg:px-6 lg:grid lg:grid-cols-[1fr_300px_280px] lg:gap-5 pt-4">
         {/* Left: Chat / Structured tabs */}
         <div>
           <div className="flex items-center gap-1 mb-3 p-1 rounded-xl bg-[--surface] border border-white/[0.06] w-fit">
@@ -204,6 +205,11 @@ export default function XodusPage() {
             </button>
           </div>
           {tab === 'chat' ? <ChatPanel /> : <CommandInbox />}
+        </div>
+
+        {/* Center: XODUS Notes */}
+        <div className="mt-5 lg:mt-0">
+          <NotesPanel />
         </div>
 
         {/* Right: Daily Brief */}
