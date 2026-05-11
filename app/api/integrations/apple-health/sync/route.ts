@@ -1,4 +1,4 @@
-// Apple Health sync — v4 2026-05-11
+// Apple Health sync — v5 2026-05-11
 // Shortcut payload: { source: "apple_health_shortcut", raw: "5676 count Today, 7:17 AM" }
 // Full envelope:    { schemaVersion: 1, daily: { date, source, syncedAt, steps?, ... } }
 // Auth: X-AH-Secret header must match APPLE_HEALTH_SYNC_SECRET env var.
@@ -11,7 +11,7 @@ import type { AppleHealthSyncEnvelope } from '@/lib/apple-health/types'
 
 const USER_ID = process.env.PICARD_USER_ID ?? '00000000-0000-0000-0000-000000000001'
 const META_KEY = 'apple_health_last_sync'
-const ROUTE_VERSION = 'v4'
+const ROUTE_VERSION = 'v5'
 
 // ─── GET ──────────────────────────────────────────────────────────────────────
 
@@ -37,10 +37,12 @@ export async function GET() {
 // ─── POST ─────────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
+  console.log(`[apple-health/${ROUTE_VERSION}] POST entered`)
   try {
     // Auth
     const expected = process.env.APPLE_HEALTH_SYNC_SECRET
     if (!expected || req.headers.get('x-ah-secret') !== expected) {
+      console.log(`[apple-health/${ROUTE_VERSION}] unauthorized — header_present:${!!req.headers.get('x-ah-secret')} env_set:${!!expected}`)
       return NextResponse.json({ synced: false, reason: 'unauthorized', version: ROUTE_VERSION }, { status: 401 })
     }
 
@@ -60,10 +62,14 @@ export async function POST(req: NextRequest) {
     const source = typeof body.source === 'string' ? body.source.trim().toLowerCase() : ''
     const rawField = typeof body.raw === 'string' ? body.raw.trim() : ''
 
+    console.log(`[apple-health/${ROUTE_VERSION}] body parsed — source:"${source}" hasRaw:${!!rawField} hasDaily:${!!body.daily}`)
+
     if (source === 'apple_health_shortcut' || (rawField && !body.daily)) {
+      console.log(`[apple-health/${ROUTE_VERSION}] shortcut branch — parsing raw`)
       // Extract steps from raw field
       const match = rawField.match(/\d+/)
       const steps = match ? parseInt(match[0], 10) : 0
+      console.log(`[apple-health/${ROUTE_VERSION}] parsed steps:${steps} from raw`)
 
       if (!steps || steps <= 0 || steps > 150_000) {
         return NextResponse.json({
@@ -110,10 +116,12 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      console.log(`[apple-health/${ROUTE_VERSION}] shortcut success — returning synced:true`)
       return NextResponse.json({ synced: true, steps, source: 'apple_health_shortcut', version: ROUTE_VERSION })
     }
 
     // ── FULL ENVELOPE PATH ────────────────────────────────────────────────────
+    console.log(`[apple-health/${ROUTE_VERSION}] full-envelope branch — running validateDailySync`)
     if ('schemaVersion' in body) body.schemaVersion = Number(body.schemaVersion)
 
     const validErr = validateDailySync(body)
