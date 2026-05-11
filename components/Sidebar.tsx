@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, MessageSquare, CalendarDays, FolderKanban, Activity, Pill, Mic, Upload, Settings } from 'lucide-react'
+import { LayoutDashboard, MessageSquare, CalendarDays, FolderKanban, Activity, Pill, Mic, Upload, Settings, Network } from 'lucide-react'
 import { JACKSON } from '@/lib/mock-data'
 
 const PRIMARY_NAV = [
@@ -14,10 +14,11 @@ const PRIMARY_NAV = [
 ] as const
 
 const SECONDARY_NAV = [
-  { href: '/stack', icon: Pill, label: 'Stack' },
-  { href: '/voice', icon: Mic, label: 'Voice' },
-  { href: '/uploads', icon: Upload, label: 'Uploads' },
-  { href: '/settings', icon: Settings, label: 'Settings' },
+  { href: '/brain',   icon: Network, label: 'Neural Link' },
+  { href: '/stack',   icon: Pill,    label: 'Stack'       },
+  { href: '/voice',   icon: Mic,     label: 'Voice'       },
+  { href: '/uploads', icon: Upload,  label: 'Uploads'     },
+  { href: '/settings',icon: Settings,label: 'Settings'    },
 ] as const
 
 export default function Sidebar() {

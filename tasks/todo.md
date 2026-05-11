@@ -47,6 +47,37 @@ OPENAI_API_KEY=<key>      # alternative provider
 
 **Pre-existing issue fixed:** 33 root-level duplicate `.ts`/`.tsx` files (stale copies of files in `lib/`, `app/`, `components/`) were tracked by git and causing TypeScript errors. Untracked with `git rm --cached -f` and deleted.
 
+---
+
+## [2026-05-10] Obsidian Neural Link /brain — SVG knowledge graph MVP
+
+**Status:** complete
+
+**Ruflo/Rooflow:** checked — no project artifacts. Skipped.
+
+**Plan:**
+- [x] Create `lib/brain-graph.ts` — data builder (types, NODE_COLORS, SYSTEM_NODES/EDGES, computeLayout, buildBrainGraph)
+- [x] Create `components/brain/BrainGraph.tsx` — SVG renderer with hover, click-to-select, detail panel
+- [x] Create `components/brain/BrainGraphLoader.tsx` — 'use client' dynamic import wrapper (Next.js 16 SSR requirement)
+- [x] Create `app/brain/page.tsx` — server component page with metadata, delegates to BrainGraphLoader
+- [x] Update `components/Sidebar.tsx` — add /brain (Network icon) to SECONDARY_NAV
+- [x] npm run build — zero errors, /brain in route list
+
+**Architecture:**
+- `lib/brain-graph.ts`: SSR-safe (`typeof window === 'undefined'` guard), reads localStorage via existing lib helpers
+- Graph: hub at center (r=0), 8 domain nodes at r=135, data nodes at r=235+ clustered by type domain
+- Edges: `<line>` colored by source node type, opacity by edge type (core=0.35, data=0.22, semantic=0.14)
+- Nodes: `<circle>` + `<text>`, glow ring on selected, hover ring, hub gets inner white dot
+- Labels: always visible for hub/domain; visible on hover or select for data nodes
+- viewBox: 640×460, responsive SVG (w-full h-auto)
+
+**Next steps (future):**
+- Force-directed simulation (d3-force) for organic layout when node count grows
+- ingestObsidianVault() — parse [[wiki-links]] + frontmatter tags
+- streamLiveUpdates() — subscribe to STORAGE_EVENTS and patch graph incrementally
+- Node filter/search bar
+- Zoom + pan (SVG transform or CSS scale)
+
 **Next TODOs (do not start yet):**
 1. **Obsidian Neural Link / /brain page** — force-directed graph, node types, vault architecture
 2. **Apple Health / HealthKit for steps** — iOS Shortcut endpoint or XML export parser
