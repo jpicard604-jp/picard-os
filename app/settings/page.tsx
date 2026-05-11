@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Download, Upload, Trash2, CheckCircle2, AlertTriangle, HardDrive, FileText, RotateCcw, Zap, RefreshCw, Link2, Heart } from 'lucide-react'
+import { Download, Upload, Trash2, CheckCircle2, AlertTriangle, HardDrive, FileText, RotateCcw, Zap, RefreshCw, Link2, Heart, Send } from 'lucide-react'
 import { STORAGE_KEYS, setStorage, resetStorageKey, validateStorageKey, getTodayLog, saveTodayLog, emptyLog, getTodayKey } from '@/lib/storage'
 import { downloadObsidianExport, downloadXodusObsidianExport } from '@/lib/obsidian-export'
 import type { WhoopDailySync } from '@/lib/whoop/types'
@@ -77,6 +77,12 @@ export default function SettingsPage() {
   const [whoopReason, setWhoopReason] = useState<string | null>(null)
   const [whoopSyncing, setWhoopSyncing] = useState(false)
   const [appleHealth, setAppleHealth] = useState<{ connected: boolean; lastSync: string | null; reason: string | null } | null>(null)
+  const [telegram, setTelegram] = useState<{
+    configured: boolean
+    restricted: boolean
+    secretSet:  boolean
+    inbox: { ready: boolean; reason: string | null }
+  } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const refreshStats = useCallback(() => {
@@ -95,6 +101,19 @@ export default function SettingsPage() {
       })
     } catch {
       setAppleHealth({ connected: false, lastSync: null, reason: 'error' })
+    }
+  }, [])
+
+  const fetchTelegramStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/integrations/telegram/webhook')
+      const data = await res.json() as {
+        configured: boolean; restricted: boolean; secretSet: boolean
+        inbox: { ready: boolean; reason: string | null }
+      }
+      setTelegram(data)
+    } catch {
+      setTelegram({ configured: false, restricted: false, secretSet: false, inbox: { ready: false, reason: 'error' } })
     }
   }, [])
 
@@ -124,6 +143,7 @@ export default function SettingsPage() {
     refreshStats()
     void fetchWhoopStatus()
     void fetchAppleHealthStatus()
+    void fetchTelegramStatus()
 
     if (navigator.storage?.estimate) {
       navigator.storage.estimate().then((e) => {
@@ -144,7 +164,7 @@ export default function SettingsPage() {
       else if (whoopParam === 'state_mismatch') toast$('OAuth state mismatch — try connecting again', false)
       else if (whoopParam === 'error') toast$('WHOOP connection failed — check server logs', false)
     }
-  }, [refreshStats, fetchWhoopStatus, fetchAppleHealthStatus])
+  }, [refreshStats, fetchWhoopStatus, fetchAppleHealthStatus, fetchTelegramStatus])
 
   function saveMeta(next: Meta) {
     setMeta(next)
@@ -419,7 +439,7 @@ export default function SettingsPage() {
             </div>
 
             {/* Apple Health row — honest planned state, no fake Connect */}
-            <div className="flex items-center gap-4 px-5 py-4">
+            <div className="flex items-center gap-4 px-5 py-4 border-b border-white/[0.04]">
               <div className="flex-shrink-0">
                 <div className={`w-2 h-2 rounded-full ${
                   appleHealth?.connected ? 'bg-green-400' : 'bg-zinc-700'
@@ -447,6 +467,53 @@ export default function SettingsPage() {
               <div className="flex items-center gap-2 flex-shrink-0">
                 <a
                   href="https://github.com/jpicard604-jp/picard-os/blob/main/docs/apple-health-shortcut-setup.md"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-zinc-500 text-[13px] font-medium hover:bg-white/[0.08] hover:text-zinc-300 active:scale-[0.98] transition-all"
+                >
+                  <FileText size={13} strokeWidth={2} />
+                  Setup guide
+                </a>
+              </div>
+            </div>
+
+            {/* Telegram → XODUS row — server-side intake via private bot */}
+            <div className="flex items-center gap-4 px-5 py-4">
+              <div className="flex-shrink-0">
+                <div className={`w-2 h-2 rounded-full ${
+                  telegram === null
+                    ? 'bg-zinc-700'
+                    : telegram.configured && telegram.inbox.ready
+                      ? 'bg-green-400'
+                      : telegram.configured
+                        ? 'bg-amber-400'
+                        : 'bg-zinc-700'
+                }`} />
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <p className="text-[14px] text-zinc-200 font-medium flex items-center gap-2">
+                  <Send size={13} className="text-sky-400" strokeWidth={2.5} />
+                  Telegram → XODUS
+                </p>
+                <p className="text-[12px] mt-0.5 text-zinc-600 leading-relaxed">
+                  {telegram === null
+                    ? 'Checking status…'
+                    : !telegram.configured
+                      ? 'Text XODUS notes, goals, groceries, health logs, screenshots, and quick thoughts. Set TELEGRAM_BOT_TOKEN to enable.'
+                      : telegram.inbox.ready
+                        ? `Configured${telegram.restricted ? ' · restricted to allowed chat' : ' · open (no chat allow-list)'}${telegram.secretSet ? ' · webhook secret set' : ''}`
+                        : telegram.inbox.reason === 'table_missing'
+                          ? 'Bot configured — run the xodus_inbox SQL to enable persistence (see setup guide)'
+                          : telegram.inbox.reason === 'no_supabase'
+                            ? 'Bot configured — Supabase env vars missing, messages will not persist'
+                            : 'Bot configured — inbox status unknown'}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <a
+                  href="https://github.com/jpicard604-jp/picard-os/blob/main/docs/telegram-xodus-intake.md"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-zinc-500 text-[13px] font-medium hover:bg-white/[0.08] hover:text-zinc-300 active:scale-[0.98] transition-all"
