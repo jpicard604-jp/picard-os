@@ -176,9 +176,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ synced: false, reason: 'missing_body' }, { status: 400 })
   }
 
+  // Normalize schemaVersion: iOS Shortcuts serialize numbers as strings.
+  // Accept both 1 and "1"; reject anything else downstream.
+  const b = body as Record<string, unknown>
+  if ('schemaVersion' in b) b.schemaVersion = Number(b.schemaVersion)
+
   // ── Shortcut: { source: "apple_health_shortcut", raw: "..." } ────────────────
-  if ((body as Record<string, unknown>).source === 'apple_health_shortcut') {
-    return handleShortcut(body as Record<string, unknown>)
+  if (b.source === 'apple_health_shortcut') {
+    return handleShortcut(b)
   }
 
   // ── Full envelope: { schemaVersion: 1, daily: { ... } } ─────────────────────
