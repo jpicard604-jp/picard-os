@@ -79,19 +79,40 @@ export async function GET() {
 
 // ─── Shortcut branch ──────────────────────────────────────────────────────────
 //
-// Accepts: { source: "apple_health_shortcut", raw: "5676 count Today, 7:17 AM" }
-// Writes a log_manual_health action to xodus_inbox (visible in /signals → apply
-// to localStorage). Also attempts Supabase daily_logs upsert as a best-effort
-// write for the future data-layer migration.
+// Accepts all three iOS Shortcut payload shapes:
+//   A: { source, raw: "5676 count Today, 7:17 AM" }
+//   B: { source, daily: { steps: 5676 } }
+//   C: { source, daily: { steps: "5676" } }   ← Shortcuts stringify numbers
+//
+// Precedence: daily.steps → raw (first integer).
+// Queues a log_manual_health action in xodus_inbox (apply from /signals).
+// Best-effort Supabase write for the future data-layer migration.
 
 async function handleShortcut(body: Record<string, unknown>): Promise<NextResponse> {
-  const raw   = typeof body.raw === 'string' ? body.raw.trim() : ''
-  const match = raw.match(/^(\d+)/)
-  const steps = match ? parseInt(match[1], 10) : null
+  // Try daily.steps (shape B / C) first; fall back to raw (shape A).
+  let steps: number | null = null
+
+  const daily = body.daily
+  if (daily !== null && typeof daily === 'object') {
+    const rawSteps = (daily as Record<string, unknown>).steps
+    const n = Number(rawSteps)
+    if (Number.isFinite(n) && n > 0) steps = Math.round(n)
+  }
+
+  if (!steps) {
+    const raw   = typeof body.raw === 'string' ? body.raw.trim() : ''
+    const match = raw.match(/\d+/)
+    if (match) steps = parseInt(match[0], 10)
+  }
 
   if (!steps || steps <= 0 || steps > 150_000) {
     return NextResponse.json(
-      { synced: false, reason: 'invalid_steps', raw, note: 'raw must start with a step count e.g. "5676 count Today, 7:17 AM"' },
+      {
+        synced: false,
+        reason: 'no_steps',
+        note:   'Send daily.steps (number or string) or raw starting with a step count.',
+        received: { daily: body.daily ?? null, raw: body.raw ?? null },
+      },
       { status: 400 },
     )
   }
@@ -145,7 +166,7 @@ async function handleShortcut(body: Record<string, unknown>): Promise<NextRespon
     }
   }
 
-  return NextResponse.json({ synced: true, steps, source: 'apple_health_shortcut', date: todayDate })
+  return NextResponse.json({ synced: true, steps, source: 'apple_health_shortcut' })
 }
 
 // ─── POST — ingest ────────────────────────────────────────────────────────────
