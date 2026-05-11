@@ -8,6 +8,8 @@ import type { XodusBrainOutput } from '@/lib/xodus/brain'
 import CommandInbox from '@/components/xodus/CommandInbox'
 import ChatPanel from '@/components/xodus/ChatPanel'
 import NotesPanel from '@/components/xodus/NotesPanel'
+import InboxPanel from '@/components/xodus/InboxPanel'
+import { fetchInboxItems } from '@/lib/xodus/inbox-client'
 
 const URGENCY_COLOR = {
   LOW:      { pill: 'text-cyan-400 bg-cyan-400/10 border-cyan-400/20',      dot: 'bg-cyan-400'   },
@@ -123,10 +125,11 @@ function DailyBriefPanel({ brain }: { brain: XodusBrainOutput }) {
   )
 }
 
-type LeftTab = 'chat' | 'structured'
+type LeftTab = 'chat' | 'structured' | 'inbox'
 
 export default function XodusPage() {
   const [tab, setTab] = useState<LeftTab>('chat')
+  const [inboxCount, setInboxCount] = useState(0)
   const [brain, setBrain] = useState<XodusBrainOutput>(() =>
     runXodusBrain(gatherBrainInput())
   )
@@ -134,6 +137,15 @@ export default function XodusPage() {
   function refresh() {
     setBrain(runXodusBrain(gatherBrainInput()))
   }
+
+  // One-shot inbox pending count for the tab badge (panel does its own polling when mounted).
+  useEffect(() => {
+    let cancelled = false
+    fetchInboxItems({ status: 'pending', limit: 25 }).then(res => {
+      if (!cancelled && res.status === 'ok') setInboxCount(res.items.length)
+    })
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     refresh()
@@ -203,8 +215,27 @@ export default function XodusPage() {
             >
               Structured
             </button>
+            <button
+              onClick={() => setTab('inbox')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-mono uppercase tracking-[0.12em] transition-colors ${
+                tab === 'inbox'
+                  ? 'bg-gradient-to-br from-pink-500/20 to-cyan-500/15 text-white border border-cyan-500/25'
+                  : 'text-zinc-600 hover:text-zinc-300'
+              }`}
+            >
+              Inbox
+              {inboxCount > 0 && (
+                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/[0.18] border border-amber-500/40 text-amber-300 normal-case tracking-normal">
+                  {inboxCount}
+                </span>
+              )}
+            </button>
           </div>
-          {tab === 'chat' ? <ChatPanel /> : <CommandInbox />}
+          {tab === 'chat'
+            ? <ChatPanel />
+            : tab === 'structured'
+              ? <CommandInbox />
+              : <InboxPanel onCountChange={setInboxCount} />}
         </div>
 
         {/* Center: XODUS Notes */}

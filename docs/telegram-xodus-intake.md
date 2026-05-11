@@ -252,22 +252,68 @@ When `daily_logs` lives in Supabase (phase 2 of the data-layer migration), a ser
 
 ---
 
-## 11. /xodus inbox UI — coming next
+## 11. /xodus Inbox UI — review & apply flow
 
-The Settings page surfaces inbox status today (configured / restricted / table ready). The next iteration of `/xodus` will add an "Inbox" tab that:
+The `/xodus` page has an **Inbox tab** (alongside Chat and Structured). It's the canonical place to review and apply anything XODUS captured from Telegram, future voice messages, screenshot OCR results, or other server-side channels.
 
-- lists pending `xodus_inbox` rows newest-first
-- shows the original message + extracted actions
-- has Apply / Dismiss buttons per row
-- on Apply, calls `applyXodusActionsClient()` and PATCHes the row to `status: applied`
+**Flow:**
 
-This is the canonical place to review and apply anything XODUS captured from Telegram, future voice messages, screenshot OCR results, or other server-side channels.
+```
+Telegram message
+    ▼
+webhook saves xodus_inbox row (status: pending)
+    ▼
+/xodus → Inbox tab (badge shows pending count)
+    ▼
+user reviews:
+    · source badge (Telegram)
+    · original text
+    · XODUS-parsed reply
+    · action chips (one per extracted XodusAction)
+    · "Raw" toggle for the full JSON payload
+    ▼
+Apply ─▶ applyXodusActionsClient(actions)        ──▶ localStorage mutations:
+        · notes, groceries → picard_xodus_notes_v1     · notes / groceries
+        · goals → picard_daily_goals_v1                · daily goals
+        · nutrition → picard_nutrition_profile_v1      · nutrition profile
+        · log_food/health → picard_daily_logs_v1       · daily logs
+        · workouts → picard_activity_logs_v1           · activity logs
+        · memory candidates → saved as note (pending)
+        · project updates → saved as project note (pending)
+        ▼
+PATCH /api/xodus/inbox/:id  { status: 'applied', appliedSummary }
+        ▼
+Row disappears from pending list. Toast: "Applied 3 actions".
+
+Ignore ─▶ PATCH /api/xodus/inbox/:id  { status: 'ignored' }
+        ▼
+Row disappears from pending list. No localStorage writes.
+```
+
+**Polling:** the Inbox panel refreshes every 30s while mounted so new Telegram messages appear without a hard reload.
+
+**Source preserved:** the inbox row keeps `source: 'telegram'`, the original text, username/chat id, and timestamp. Applied notes/goals do not currently carry a `source` field in their local types — the inbox row is the audit record. Future: thread `source` through to `addNote()/addGoals()` for in-app provenance.
+
+**Brain / Obsidian compatibility:** applied Telegram items become real notes/goals/activities through the same `addNote/addGoals/addActivityLog` paths the rest of the app uses. They show up in `/brain` and Obsidian export with **zero additional work** — no graph changes required.
 
 ---
 
-## 12. Remaining TODOs
+## 12. Troubleshooting
 
-- [ ] Build `/xodus` inbox UI (list, apply, dismiss)
+| Symptom | Cause | Fix |
+|---|---|---|
+| Inbox panel shows *"xodus_inbox table is not set up yet."* | SQL never ran in Supabase | Run § 5 SQL |
+| Empty Inbox after sending Telegram message | Webhook failed before insert | Check `Invoke-RestMethod` `getWebhookInfo` and Vercel logs |
+| Apply shows *"applied locally, but inbox update failed"* | Local applier ran fine but PATCH /api/xodus/inbox/:id failed | Action is already written to localStorage. Manually mark the row in Supabase or re-run apply (idempotency is best-effort) |
+| Actions applied but I don't see them in Notes/Goals | Same browser? localStorage is per-browser-per-device | The applier writes to the **browser running /xodus**. Apply on the device where you want the data. A different browser/device sees nothing until that browser opens /xodus and re-applies, OR until Supabase mirror tables land |
+| Telegram message arrived but no actions parsed | Rule-based fallback didn't match; AI provider may be down or missing key | Check `DEEPSEEK_API_KEY` / `AI_PROVIDER`. Inbox row will still exist with empty actions — Ignore it |
+| Badge count stays at 0 with rows in Supabase | Status filter / browser cache | Hit the refresh button in the Inbox panel header |
+
+---
+
+## 13. Remaining TODOs
+
+- [x] Build `/xodus` Inbox UI (list, apply, dismiss) — shipped
 - [ ] Telegram file download + OCR (start with MyFitnessPal screenshots)
 - [ ] Voice transcription pipeline (Whisper) for voice notes
 - [ ] Server-side direct `daily_logs` writes (phase 2 — when Supabase mirror tables land)

@@ -4,6 +4,30 @@ This file tracks active and completed tasks. Claude Code updates this file for e
 
 ---
 
+## [2026-05-10] XODUS Inbox UI — review & apply Telegram pending actions
+
+**Status:** complete
+
+**Files added:**
+- `app/api/xodus/inbox/route.ts` — GET pending rows (filter: status, limit: 25)
+- `app/api/xodus/inbox/[id]/route.ts` — PATCH status applied/ignored/failed
+- `lib/xodus/inbox-client.ts` — `fetchInboxItems` + `patchInboxStatus`
+- `components/xodus/InboxPanel.tsx` — review/apply UI with action chips, raw toggle, polling
+
+**Files updated:**
+- `app/xodus/page.tsx` — third tab `Inbox` with pending-count badge; one-shot count fetch on mount
+- `docs/telegram-xodus-intake.md` — § 11 inbox flow diagram, § 12 troubleshooting, TODO checkbox
+
+**Behavior:** Telegram messages land in `xodus_inbox` as pending. Inbox tab lists them with extracted actions. Apply runs the same `applyXodusActionsClient()` used by web chat → writes to existing localStorage stores → PATCHes the row to `applied`. Ignore PATCHes to `ignored`. Both remove from the visible list.
+
+**Brain/Obsidian:** zero new wiring — applied items flow into existing `addNote/addGoals/addActivityLog`, which already feed `/brain` and the Obsidian export.
+
+**Table-missing:** Inbox panel shows an amber callout linking to the doc's SQL section; Settings Telegram row already reflects the same status.
+
+**Build:** ✓ pass (27 routes + inbox routes = 29).
+
+---
+
 ## [2026-05-10] Neural Link force-directed upgrade + trends tooltip fix
 
 **Status:** complete
