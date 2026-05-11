@@ -14,6 +14,7 @@ import { getActivityLogs } from './fitness'
 import { getTodayGoals } from './daily-goals'
 import { getNutritionProfile } from './nutrition-profile'
 import { getRecentNotes } from './xodus/notes'
+import { getXodusMemoryRecords } from './xodus/memory'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -21,7 +22,7 @@ export type BrainNodeType =
   | 'project' | 'daily'    | 'fitness'  | 'nutrition'
   | 'school'  | 'car'      | 'money'    | 'contact'
   | 'task'    | 'upload'   | 'xodus'    | 'obsidian'
-  | 'note'    | 'system'
+  | 'note'    | 'system'   | 'memory'
 
 export interface BrainGraphNode {
   id:       string
@@ -31,7 +32,12 @@ export interface BrainGraphNode {
   color?:   string
   summary?: string
   date?:    string
-  source?:  string     // 'system' | 'localStorage' | 'obsidian' | 'ai'
+  source?:  string     // 'system' | 'localStorage' | 'obsidian' | 'ai' | 'memory'
+  // Memory node metadata — only set on type:'memory' nodes
+  memoryCategory?:  string
+  memoryStatus?:    'current' | 'historical' | 'needs_confirmation'
+  memoryConfidence?: 'high' | 'medium' | 'low'
+  memoryFilePath?:  string
 }
 
 export interface BrainGraphEdge {
@@ -68,6 +74,7 @@ export const NODE_COLORS: Record<BrainNodeType, string> = {
   car:       '#94a3b8',  // slate
   money:     '#34d399',  // emerald
   contact:   '#e879f9',  // fuchsia
+  memory:    '#a5b4fc',  // indigo-300 — meta/AI memory layer
 }
 
 // ─── Domain node IDs ──────────────────────────────────────────────────────────
@@ -95,6 +102,7 @@ const TYPE_TO_DOMAIN: Record<BrainNodeType, string> = {
   car:       'hub-daily',
   money:     'hub-daily',
   contact:   'hub-xodus',
+  memory:    HUB_ID,
 }
 
 // ─── Layout computation ───────────────────────────────────────────────────────
@@ -330,6 +338,30 @@ export function buildBrainGraph(): BrainGraphData {
     })
     addEdge(edge('hub-nutrition', 'nutrition-profile', 'profile', 0.9))
     addEdge(edge('hub-xodus',     'nutrition-profile', 'context', 0.3))
+  }
+
+  // ── XODUS memory nodes (curated static records from memory/ files) ─────────
+  const memoryRecords = getXodusMemoryRecords()
+  for (const rec of memoryRecords) {
+    addNode({
+      id:               rec.id,
+      label:            rec.title,
+      type:             'memory',
+      size:             11,
+      summary:          rec.summary,
+      source:           'memory',
+      memoryCategory:   rec.category,
+      memoryStatus:     rec.status,
+      memoryConfidence: rec.confidence,
+      memoryFilePath:   rec.filePath,
+    })
+    // Primary connections from graphLinks
+    const links = rec.graphLinks ?? [HUB_ID]
+    for (let i = 0; i < links.length; i++) {
+      const targetId = links[i]
+      const strength = i === 0 ? 0.8 : 0.45
+      addEdge(edge(targetId, rec.id, 'memory', strength))
+    }
   }
 
   return { nodes, edges }

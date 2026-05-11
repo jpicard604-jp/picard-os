@@ -22,6 +22,7 @@ const LEGEND = [
   { type: 'daily',     label: 'Daily'     },
   { type: 'task',      label: 'Goals'     },
   { type: 'note',      label: 'Notes'     },
+  { type: 'memory',    label: 'Memory'    },
   { type: 'obsidian',  label: 'Vault'     },
   { type: 'system',    label: 'System'    },
 ] as const
@@ -588,6 +589,15 @@ export default function BrainGraph() {
                 <span className="text-zinc-300">{previewConnCount}</span> connections
               </span>
               {previewNode.source && <span>· {previewNode.source}</span>}
+              {previewNode.memoryStatus && (
+                <span className={
+                  previewNode.memoryStatus === 'current' ? 'text-emerald-500'
+                  : previewNode.memoryStatus === 'historical' ? 'text-zinc-600'
+                  : 'text-amber-500'
+                }>
+                  · {previewNode.memoryStatus.replace(/_/g, ' ')}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -634,6 +644,58 @@ export default function BrainGraph() {
 
             {selectedNode.date && (
               <p className="text-[9px] font-mono text-zinc-600">{selectedNode.date}</p>
+            )}
+
+            {/* Memory node metadata */}
+            {selectedNode.type === 'memory' && (
+              <div className="pt-2 border-t border-white/[0.05] space-y-1.5">
+                <p className="text-[8px] font-mono uppercase tracking-[0.16em] text-zinc-700 mb-2">
+                  Memory Record
+                </p>
+                {selectedNode.memoryCategory && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] font-mono text-zinc-600">Category</span>
+                    <span className="text-[9px] font-mono text-indigo-300 bg-indigo-400/10 px-1.5 py-0.5 rounded">
+                      {selectedNode.memoryCategory.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                )}
+                {selectedNode.memoryStatus && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] font-mono text-zinc-600">Status</span>
+                    <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
+                      selectedNode.memoryStatus === 'current'
+                        ? 'text-emerald-400 bg-emerald-400/10'
+                        : selectedNode.memoryStatus === 'historical'
+                        ? 'text-zinc-500 bg-white/[0.04]'
+                        : 'text-amber-400 bg-amber-400/10'
+                    }`}>
+                      {selectedNode.memoryStatus.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                )}
+                {selectedNode.memoryConfidence && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] font-mono text-zinc-600">Confidence</span>
+                    <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
+                      selectedNode.memoryConfidence === 'high'
+                        ? 'text-cyan-400 bg-cyan-400/10'
+                        : selectedNode.memoryConfidence === 'medium'
+                        ? 'text-amber-400 bg-amber-400/10'
+                        : 'text-zinc-500 bg-white/[0.04]'
+                    }`}>
+                      {selectedNode.memoryConfidence}
+                    </span>
+                  </div>
+                )}
+                {selectedNode.memoryFilePath && (
+                  <div className="pt-1">
+                    <span className="text-[8px] font-mono text-zinc-700 break-all">
+                      {selectedNode.memoryFilePath}
+                    </span>
+                  </div>
+                )}
+              </div>
             )}
 
             {connectedNodes.length > 0 && (
