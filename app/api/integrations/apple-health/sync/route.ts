@@ -1,15 +1,17 @@
 // Apple Health ingestion endpoint.
 //
-// Receives normalized HealthKit daily data from:
-//   - an iOS Shortcut (Phase 1 MVP) that POSTs JSON via the "Get contents of URL" action
-//   - a future Capacitor/iOS companion app reading HealthKit and POSTing nightly
+// Two accepted POST formats:
 //
-// Auth (Phase 1 — single-user, no Supabase Auth yet):
-//   Requires `X-AH-Secret` header to match APPLE_HEALTH_SYNC_SECRET env var.
-//   This is enforced server-side and is the only mutation guard until full auth lands.
+//   1. iOS Shortcut (MVP):
+//      { "source": "apple_health_shortcut", "raw": "5676 count Today, 7:17 AM" }
+//      Steps are parsed from the first integer in `raw`. Result is queued in
+//      xodus_inbox so the /signals UI can apply them to localStorage.
 //
-// Source precedence: see lib/apple-health/map.ts — only fields with concrete values
-// are written; manual entries and WHOOP-owned columns are never overwritten.
+//   2. Full HealthKit envelope (future companion app):
+//      { "schemaVersion": 1, "daily": { ... } }
+//      See lib/apple-health/types.ts for the full schema.
+//
+// Auth: requires X-AH-Secret header matching APPLE_HEALTH_SYNC_SECRET env var.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -18,10 +20,11 @@ import {
   mapAppleHealthToDailyPatch,
   mapAppleHealthWorkoutToActivity,
 } from '@/lib/apple-health/map'
+import { saveXodusInboxItem } from '@/lib/xodus/inbox-server'
 import type { AppleHealthSyncEnvelope } from '@/lib/apple-health/types'
 
-const USER_ID = process.env.PICARD_USER_ID || '00000000-0000-0000-0000-000000000001'
-const META_KEY_NAME = 'apple_health_last_sync'
+const USER_ID    = process.env.PICARD_USER_ID || '00000000-0000-0000-0000-000000000001'
+const META_KEY   = 'apple_health_last_sync'
 
 function authorized(req: NextRequest): boolean {
   const expected = process.env.APPLE_HEALTH_SYNC_SECRET
@@ -30,16 +33,23 @@ function authorized(req: NextRequest): boolean {
   return !!got && got === expected
 }
 
-/* ─── GET — connection status ───────────────────────────────────────────────── */
+// ─── GET — connection / last-sync status ─────────────────────────────────────
+
 export async function GET() {
-  // Phase 1: no token table. Report whether the env secret is configured and
-  // when we last successfully ingested a payload.
   const configured = !!process.env.APPLE_HEALTH_SYNC_SECRET
   if (!configured) {
     return NextResponse.json({
       connected: false,
-      reason: 'not_configured',
-      note: 'Set APPLE_HEALTH_SYNC_SECRET in env to enable ingestion',
+      reason:    'not_configured',
+      note:      'Set APPLE_HEALTH_SYNC_SECRET in env and send X-AH-Secret header from Shortcut.',
+    })
+  }
+
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SECRET_KEY) {
+    return NextResponse.json({
+      connected: false,
+      reason:    'no_supabase',
+      note:      'Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY to enable status tracking.',
     })
   }
 
@@ -49,18 +59,12 @@ export async function GET() {
       .from('integration_meta')
       .select('value, updated_at')
       .eq('user_id', USER_ID)
-      .eq('key', META_KEY_NAME)
+      .eq('key', META_KEY)
       .maybeSingle()
 
-    // Table-missing is expected until migration runs; treat as planned.
     if (error?.code === '42P01') {
-      return NextResponse.json({
-        connected: false,
-        reason: 'table_missing',
-        note: 'integration_meta table not created yet — see docs/apple-health-integration-plan.md § Supabase schema',
-      })
+      return NextResponse.json({ connected: false, reason: 'table_missing', lastSync: null })
     }
-
     const row = data as { value: string; updated_at: string } | null
     return NextResponse.json({
       connected: !!row,
@@ -68,62 +72,160 @@ export async function GET() {
       reason:    row ? 'ok' : 'not_synced_yet',
     })
   } catch (err) {
-    console.error('[apple-health/sync:GET] threw', err)
-    return NextResponse.json({ connected: false, reason: 'error' })
+    console.error('[apple-health/sync:GET]', err)
+    return NextResponse.json({ connected: false, reason: 'error', lastSync: null })
   }
 }
 
-/* ─── POST — ingest one day of HealthKit data ───────────────────────────────── */
+// ─── Shortcut branch ──────────────────────────────────────────────────────────
+//
+// Accepts: { source: "apple_health_shortcut", raw: "5676 count Today, 7:17 AM" }
+// Writes a log_manual_health action to xodus_inbox (visible in /signals → apply
+// to localStorage). Also attempts Supabase daily_logs upsert as a best-effort
+// write for the future data-layer migration.
+
+async function handleShortcut(body: Record<string, unknown>): Promise<NextResponse> {
+  const raw   = typeof body.raw === 'string' ? body.raw.trim() : ''
+  const match = raw.match(/^(\d+)/)
+  const steps = match ? parseInt(match[1], 10) : null
+
+  if (!steps || steps <= 0 || steps > 150_000) {
+    return NextResponse.json(
+      { synced: false, reason: 'invalid_steps', raw, note: 'raw must start with a step count e.g. "5676 count Today, 7:17 AM"' },
+      { status: 400 },
+    )
+  }
+
+  const todayDate = new Date().toISOString().slice(0, 10)
+  console.log(`[apple-health/shortcut] steps:${steps} date:${todayDate}`)
+
+  // Queue in xodus_inbox → user applies from /signals (writes localStorage).
+  await saveXodusInboxItem({
+    source:        'shortcut',
+    text:          `Apple Health: ${steps.toLocaleString()} steps`,
+    parsedSummary: `Logged ${steps.toLocaleString()} steps from Apple Health Shortcut.`,
+    actions:       [{ type: 'log_manual_health', steps, date: todayDate, confidence: 0.95 }],
+  }).catch(() => { /* non-fatal — inbox may not be configured */ })
+
+  // Best-effort Supabase write (for future Supabase data layer migration).
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SECRET_KEY) {
+    try {
+      const supabase = createAdminClient()
+      const { data: existing, error: selectErr } = await supabase
+        .from('daily_logs')
+        .select('id')
+        .eq('user_id', USER_ID)
+        .eq('date',    todayDate)
+        .maybeSingle()
+
+      if (!selectErr) {
+        if (existing) {
+          await supabase.from('daily_logs').update({ steps }).eq('user_id', USER_ID).eq('date', todayDate)
+        } else {
+          await supabase.from('daily_logs').insert({
+            user_id: USER_ID, date: todayDate, steps,
+            smoked_today: false, drank_today: false, notes: '',
+            saved_at: new Date().toISOString(),
+          })
+        }
+      }
+
+      // Record sync timestamp so GET shows connected: true.
+      await supabase.from('integration_meta').upsert(
+        {
+          user_id:    USER_ID,
+          key:        META_KEY,
+          value:      JSON.stringify({ date: todayDate, steps, source: 'apple_health_shortcut' }),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,key' },
+      )
+    } catch (err) {
+      console.error('[apple-health/shortcut] supabase write failed (non-fatal):', err)
+    }
+  }
+
+  return NextResponse.json({ synced: true, steps, source: 'apple_health_shortcut', date: todayDate })
+}
+
+// ─── POST — ingest ────────────────────────────────────────────────────────────
+
 export async function POST(req: NextRequest) {
   if (!authorized(req)) {
-    return NextResponse.json({ synced: false, reason: 'unauthorized' }, { status: 401 })
+    return NextResponse.json(
+      {
+        synced: false,
+        reason: 'unauthorized',
+        note:   'Send X-AH-Secret header matching APPLE_HEALTH_SYNC_SECRET env var.',
+      },
+      { status: 401 },
+    )
   }
 
   let body: unknown
-  try { body = await req.json() } catch {
-    return NextResponse.json({ synced: false, reason: 'invalid_json' }, { status: 400 })
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json(
+      { synced: false, reason: 'invalid_json', note: 'Body must be valid JSON.' },
+      { status: 400 },
+    )
   }
 
+  if (typeof body !== 'object' || body === null) {
+    return NextResponse.json({ synced: false, reason: 'missing_body' }, { status: 400 })
+  }
+
+  // ── Shortcut: { source: "apple_health_shortcut", raw: "..." } ────────────────
+  if ((body as Record<string, unknown>).source === 'apple_health_shortcut') {
+    return handleShortcut(body as Record<string, unknown>)
+  }
+
+  // ── Full envelope: { schemaVersion: 1, daily: { ... } } ─────────────────────
   const validationError = validateDailySync(body)
   if (validationError) {
-    return NextResponse.json({ synced: false, reason: 'validation_failed', error: validationError }, { status: 400 })
+    return NextResponse.json(
+      {
+        synced: false,
+        reason: 'validation_failed',
+        error:  validationError,
+        note:   'For iOS Shortcut, send { "source": "apple_health_shortcut", "raw": "5676 count Today, 7:17 AM" }',
+      },
+      { status: 400 },
+    )
   }
 
-  const env     = body as AppleHealthSyncEnvelope
-  const daily   = env.daily
+  const env      = body as AppleHealthSyncEnvelope
+  const daily    = env.daily
   const supabase = createAdminClient()
 
-  // ── Upsert daily_logs (patch only fields with values) ─────────────────────
+  // ── Upsert daily_logs ────────────────────────────────────────────────────────
   const { date, patch } = mapAppleHealthToDailyPatch(daily)
 
   try {
-    const { data: existingRow, error: existingErr } = await supabase
+    const { data: existing, error: selectErr } = await supabase
       .from('daily_logs')
       .select('id')
       .eq('user_id', USER_ID)
       .eq('date', date)
       .maybeSingle()
 
-    if (existingErr?.code === '42P01') {
+    if (selectErr?.code === '42P01') {
       return NextResponse.json(
         { synced: false, reason: 'table_missing', sql: 'Run docs/supabase-phase1-schema.sql' },
-        { status: 503 }
+        { status: 503 },
       )
     }
 
-    if (existingRow) {
+    if (existing) {
       if (Object.keys(patch).length > 0) {
         await supabase.from('daily_logs').update(patch).eq('user_id', USER_ID).eq('date', date)
       }
     } else {
       await supabase.from('daily_logs').insert({
-        user_id:      USER_ID,
-        date,
-        ...patch,
-        smoked_today: false,
-        drank_today:  false,
-        notes:        '',
-        saved_at:     new Date().toISOString(),
+        user_id: USER_ID, date, ...patch,
+        smoked_today: false, drank_today: false, notes: '',
+        saved_at: new Date().toISOString(),
       })
     }
   } catch (err) {
@@ -131,7 +233,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ synced: false, reason: 'daily_logs_failed' }, { status: 500 })
   }
 
-  // ── Workouts — dedupe by (user_id, external_id) ───────────────────────────
+  // ── Workouts — dedupe by external_id ────────────────────────────────────────
   let workoutsAdded = 0
   for (const w of daily.workouts ?? []) {
     try {
@@ -145,37 +247,28 @@ export async function POST(req: NextRequest) {
       if (!existing) {
         const row = mapAppleHealthWorkoutToActivity(w)
         await supabase.from('activity_logs').insert({
-          id:         crypto.randomUUID(),
-          user_id:    USER_ID,
-          ...row,
+          id: crypto.randomUUID(), user_id: USER_ID, ...row,
           created_at: new Date().toISOString(),
         })
         workoutsAdded++
       }
     } catch (err) {
-      console.error('[apple-health/sync] workout upsert failed:', w.externalId, err)
+      console.error('[apple-health/sync] workout insert failed:', w.externalId, err)
     }
   }
 
-  // ── Record sync timestamp in integration_meta (best-effort) ───────────────
+  // ── Record sync timestamp ────────────────────────────────────────────────────
   try {
     await supabase.from('integration_meta').upsert(
       {
         user_id:    USER_ID,
-        key:        META_KEY_NAME,
+        key:        META_KEY,
         value:      JSON.stringify({ date, fields: Object.keys(patch), workoutsAdded }),
         updated_at: new Date().toISOString(),
       },
-      { onConflict: 'user_id,key' }
+      { onConflict: 'user_id,key' },
     )
-  } catch {
-    // table may not exist yet — non-fatal, GET will report 'table_missing'
-  }
+  } catch { /* table may not exist yet */ }
 
-  return NextResponse.json({
-    synced: true,
-    date,
-    fieldsPatched: Object.keys(patch),
-    workoutsAdded,
-  })
+  return NextResponse.json({ synced: true, date, fieldsPatched: Object.keys(patch), workoutsAdded })
 }
