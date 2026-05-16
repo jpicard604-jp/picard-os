@@ -16,6 +16,7 @@ import type { ActivityLog, ActivityType, ExerciseSet } from '@/lib/fitness'
 import { STORAGE_EVENTS, getTodayLog } from '@/lib/storage'
 import type { DailyLog } from '@/lib/storage'
 import Link from 'next/link'
+import WhoopAutoSync from '@/components/WhoopAutoSync'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -673,6 +674,7 @@ export default function FitnessPage() {
 
   return (
     <div className="pb-8">
+      <WhoopAutoSync />
       {/* Header */}
       <div className="relative px-5 pt-10 pb-6 lg:px-10 border-b border-white/[0.05] overflow-hidden mb-3">
         <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse at 15% 0%, rgba(34,211,238,0.07) 0%, rgba(236,72,153,0.03) 50%, transparent 70%)' }} />

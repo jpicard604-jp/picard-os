@@ -149,7 +149,14 @@ async function callAnthropic(req: AIRequest): Promise<AIResponse> {
 // without a real API key. CommandInbox regex parsing still handles real extraction.
 
 function callMock(_req: AIRequest): AIResponse {
+  // Produce a JSON envelope that satisfies BOTH consumer shapes:
+  //   - brain-router (xodus chat) reads `.reply` + `.actions`
+  //   - agent route reads `.actions` + `.summary`
+  // The reply is intentionally conversational so the fallback path still
+  // sounds like XODUS instead of "no_op classification".
+  const reply = "Heads up — XODUS AI provider isn't configured yet, so I'm running on the local rule-based fallback. Workouts, food, groceries, and goal phrases still work; full conversational mode needs a DeepSeek / Anthropic / OpenAI key in env."
   const text = JSON.stringify({
+    reply,
     actions: [
       {
         type:                'no_op',
@@ -157,17 +164,15 @@ function callMock(_req: AIRequest): AIResponse {
         source:              'text',
         summary:             'Mock provider active — no AI key configured.',
         requiresConfirmation: false,
-        warnings:            ['No AI provider key configured — set AI_PROVIDER and the matching *_API_KEY in .env.local'],
+        warnings:            ['No AI provider key configured — set AI_PROVIDER and the matching *_API_KEY.'],
         timestamp:           new Date().toISOString(),
         payload: {
-          reason: 'No AI provider is configured. The regex-based CommandInbox parser is still active and handles common workout and nutrition inputs.',
-          suggestions: [
-            'Add AI_PROVIDER=deepseek and DEEPSEEK_API_KEY=<key> to .env.local for low-cost AI extraction.',
-            'Or add AI_PROVIDER=anthropic and ANTHROPIC_API_KEY=<key> to use Claude.',
-          ],
+          reason: 'No AI provider is configured.',
         },
       },
     ],
+    confidence: 0.5,
+    warnings: ['mock_provider'],
     summary: 'Mock provider — configure an AI provider key to enable full extraction.',
   })
 

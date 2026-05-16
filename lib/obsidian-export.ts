@@ -7,6 +7,8 @@ import { getXodusMemoryRecords } from './xodus/memory'
 import type { DailyLog, VoiceLog } from './storage'
 import type { ActivityLog } from './fitness'
 import type { HistoryEntry } from './command-parser'
+import type { DailyGoal } from './daily-goals'
+import type { VaultInput } from './obsidian-vault'
 
 function fmtDateLong(isoOrDate: string): string {
   return new Date(isoOrDate).toLocaleDateString('en-US', {
@@ -385,6 +387,48 @@ export function downloadXodusObsidianExport(): void {
   const a = document.createElement('a')
   a.href = url
   a.download = `xodus-memory-notes-${date}.md`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+// ── Vault ZIP (multi-file staging export) ─────────────────────────────────────
+//
+// Gathers all relevant data from localStorage, POSTs to /api/obsidian/export-zip,
+// receives the ZIP blob, triggers download. Existing flat exports remain intact.
+// One-way only — does not write into the user's real Obsidian vault.
+
+function gatherVaultInput(): VaultInput {
+  return {
+    dailyLogs:        getStorage<Record<string, DailyLog>>(STORAGE_KEYS.DAILY_LOGS, {}),
+    activityLogs:     getStorage<ActivityLog[]>(STORAGE_KEYS.ACTIVITY_LOGS, []),
+    voiceLogs:        getStorage<VoiceLog[]>(STORAGE_KEYS.VOICE_LOGS, []),
+    projects:         getProjects(),
+    xodusNotes:       getAllNotes(),
+    xodusMemory:      getXodusMemoryRecords(),
+    dailyGoals:       getStorage<Record<string, DailyGoal[]>>('picard_daily_goals_v1', {}),
+    nutritionProfile: getNutritionProfile(),
+    commandHistory:   getStorage<HistoryEntry[]>('picard_command_history_v1', []),
+  }
+}
+
+export async function downloadVaultZip(): Promise<void> {
+  const input = gatherVaultInput()
+  const res = await fetch('/api/obsidian/export-zip', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(input),
+  })
+  if (!res.ok) {
+    throw new Error(`Vault ZIP export failed (${res.status})`)
+  }
+  const blob = await res.blob()
+  const date = new Date().toISOString().slice(0, 10)
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `picard-vault-${date}.zip`
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)

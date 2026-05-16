@@ -307,10 +307,12 @@ function buildReply(actions: XodusAction[], ctx: XodusChatContext): string {
   if (counts.health > 0)  parts.push('Manual health logged.')
   if (counts.food > 0)    parts.push('Food logged.')
   if (counts.goals > 0)   parts.push(`Captured ${counts.goals} goal${counts.goals > 1 ? 's' : ''}.`)
-  if (counts.groc > 0)    parts.push('Added to groceries.')
-  if (counts.notes > 0 && counts.groc === 0 && counts.proj === 0) parts.push('Saved as a note.')
-  if (counts.proj > 0)    parts.push('Pinned to the project — saved for review.')
-  if (counts.mem > 0)     parts.push('Memory candidate saved for review.')
+  // Rule-based fallback talks like XODUS, not like a form receipt. This path
+  // runs only when the AI provider is unreachable or returns nothing parseable.
+  if (counts.groc > 0)    parts.push("Got it — I'd add those to the grocery list once Telegram saves are wired.")
+  if (counts.notes > 0 && counts.groc === 0 && counts.proj === 0) parts.push("Holding that as a note for /xodus to pick up.")
+  if (counts.proj > 0)    parts.push("Treating that as a project update — pending review on /xodus.")
+  if (counts.mem > 0)     parts.push("That sounds like a memory candidate — flagging for review.")
 
   const training = actions.find(a => a.type === 'training_recommendation') as TrainingRecommendationAction | undefined
   if (training) parts.push(training.summary)
@@ -320,10 +322,10 @@ function buildReply(actions: XodusAction[], ctx: XodusChatContext): string {
     const log = ctx.dailyLog
     if (log?.protein !== null && log?.protein !== undefined && ctx.nutritionProfile.proteinTarget) {
       const gap = ctx.nutritionProfile.proteinTarget - log.protein
-      if (gap > 0) parts.push(`You're ${gap}g short of your ${ctx.nutritionProfile.proteinTarget}g protein target.`)
-      else parts.push(`Protein target met (${log.protein}g).`)
+      if (gap > 0) parts.push(`You're ${gap}g short of your ${ctx.nutritionProfile.proteinTarget}g protein target — easy fix.`)
+      else parts.push(`Protein target met (${log.protein}g). Solid.`)
     } else {
-      parts.push("Got it. Tell me what to log — workout, food, note, goal, project update.")
+      parts.push("AI provider is offline so I'm in fallback mode. Tell me what's on your plate and I'll help rank it.")
     }
   }
 

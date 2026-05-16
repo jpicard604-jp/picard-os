@@ -32,6 +32,16 @@ export interface DailyLog {
   drankToday: boolean
   confidenceScore: number | null
   mood: number | null
+  /** 0–100 mood / mental state self-check. Replaces the old 1–5 `mood` scale
+   *  for forward-looking UI; the legacy field remains for back-compat. */
+  mentalScore: number | null
+  /** ISO timestamp of the most recent mentalScore write. Used for future
+   *  productivity-period analysis (most-productive hours). */
+  mentalScoreUpdatedAt: string | null
+  /** 1–10 energy self-check, paired with mentalScore on the daily check-in. */
+  energyScore: number | null
+  /** ISO timestamp of the most recent energyScore write. */
+  energyScoreUpdatedAt: string | null
   notes: string
   // Recovery / WHOOP fields (manual entry until real API connects)
   recoveryScore: number | null   // 0-100
@@ -70,6 +80,10 @@ export function emptyLog(date: string): DailyLog {
     drankToday: false,
     confidenceScore: null,
     mood: null,
+    mentalScore: null,
+    mentalScoreUpdatedAt: null,
+    energyScore: null,
+    energyScoreUpdatedAt: null,
     notes: '',
     recoveryScore: null,
     hrv: null,

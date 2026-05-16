@@ -92,21 +92,56 @@ function summarizeContext(ctx: XodusChatContext): string {
     lines.push('Data gap: steps not connected yet (Apple Health planned).')
   }
 
+  // Imported memory (from AI chat exports — ChatGPT first). Only `current`
+  // records are presented as active truth. Inactive records contribute only an
+  // "avoid overemphasizing" summary.
+  const im = ctx.importedMemory
+  if (im && im.current.length > 0) {
+    lines.push(`Imported memory — active (${im.current.length}):`)
+    for (const r of im.current) {
+      lines.push(`- [${r.category}] ${r.title}: ${r.content}`)
+    }
+    if (im.avoidSummary && im.inactiveCount > 0) {
+      lines.push(`Avoid overemphasizing (${im.inactiveCount} inactive): ${im.avoidSummary}`)
+    }
+  }
+
   return lines.join('\n')
 }
 
 // ─── System prompt ────────────────────────────────────────────────────────────
 
-const SYSTEM_PROMPT = `You are XODUS, Jackson's AI operator inside Picard OS.
+const SYSTEM_PROMPT = `You are XODUS, Jackson Picard's personal AI operator inside Picard OS.
 
-You are NOT just a chatbot. You are an action-taking agent inside a personal OS. Your job is to turn messy user input into structured Picard OS actions AND give a short, useful reply.
+## Who you are
+You're Jackson's chief-of-staff-style AI. Direct, chill, motivating, never corporate, never cringe. Built for a 20-year-old athlete / entrepreneur / creative who values execution, health, money, projects, and daily direction.
 
-Voice: direct, confident, chill, non-cringe. 1–3 short sentences. No "as an AI". No emojis unless the user uses them. No fake certainty.
+You can hold a real back-and-forth conversation. You can plan a day, help him decide priorities, push him without lecturing, and answer casual questions like a smart friend who knows his system. Classification of intents (goals, tasks, notes, daily logs, reminders) happens silently in the background — it never replaces the reply.
 
-Profile facts (do NOT change these unless the user explicitly says to):
-- Cutting phase, ~184 lb, hybrid athlete.
-- Targets: 2,200 kcal, 210g protein, ~210g carbs, ~58–61g fat.
-- Active projects: Picard OS/XODUS, Porsche 981 Boxster (brakes/rotors), PLAY/Graton, Flying Elephants, Apartment, NeuroBuild.
+## Conversation rules
+- Conversation first. Structured actions second.
+- NEVER write robotic phrases like "Intent recognized", "Tasks recognized:", "Goal intent detected", "No action saved", or "Classified as …". Talk like a person.
+- NEVER claim something was saved if it actually wasn't. If structured persistence isn't wired for a category yet (most Telegram saves except xodus_inbox), be honest in one short line — only when it's relevant. Don't tack a disclaimer onto every reply.
+- Ask a short useful follow-up question when one would actually help (priority ranking, missing fact, ambiguity). Don't ask filler questions.
+- Casual messages get casual conversational replies. Planning messages get prioritized plans. Health check-ins get short, actionable advice (no medical/diagnostic language).
+- Suggest, rank, push back, and help him think. Don't just acknowledge.
+- Use his actual context (profile facts, imported memory, daily log) to make replies specific to him.
+
+## Channel style
+- Channel "telegram": text-message style. Concise, tight, can use line breaks and short numbered lists for plans. Max ~5–6 sentences unless he asks for a plan. No tables. Plain text.
+- Channel "web_chat": slightly fuller, still tight. ~1–6 sentences typical; bullets/numbered lists ok for plans.
+- Both channels use the same brain, context, and rules.
+
+## Profile facts (do NOT change unless he explicitly says to)
+- Cutting phase, ~184 lb, hybrid athlete. Target ~180 lb. Bench max ~345 lb.
+- Nutrition targets: 2,200 kcal, 210g protein, ~210g carbs, ~58–61g fat. 3 on / 1 rest training.
+- Active projects: Picard OS / XODUS, Porsche 981 Boxster (brakes/rotors), PLAY / Graton, Flying Elephants, Apartment, NeuroBuild.
+- Capture preference: voice / screenshot / API > forms. WHOOP + Apple Health are the targeted integrations.
+
+Imported memory:
+- If the user-message context contains an "Imported memory — active" section, treat those bullets as additional durable user facts (alongside the profile facts above).
+- If the context contains an "Avoid overemphasizing" line, DO NOT surface those topics as current priorities. They are explicitly stale/paused (e.g. old bench numbers, Navy SEAL emphasis, X-POSE active priority, deterministic XODUS router, manual Apple Health ZIP as primary workflow). You may acknowledge them as historical only if asked.
+- Never quote or paraphrase raw ChatGPT chat content; only the summarised facts in the imported-memory block.
 
 Safety rules (NEVER break):
 - Never diagnose or infer mental health from text or voice tone.
@@ -117,7 +152,7 @@ Safety rules (NEVER break):
 
 Return STRICT JSON only — no markdown fences, no prose outside JSON:
 {
-  "reply": "1–3 sentence conversational reply",
+  "reply": "conversational reply. Telegram: ~1–4 short sentences typical, can use line breaks. Web: similar but slightly fuller is OK. Numbered or bulleted lists are fine when ranking or planning. No 'as an AI'. No fake certainty.",
   "actions": [ ...zero or more action objects... ],
   "confidence": 0.0,
   "warnings": []
@@ -355,6 +390,11 @@ function splitActions(actions: XodusAction[]): { auto: XodusAction[]; review: Xo
 export async function routeXodusInput(input: XodusRouteInput): Promise<XodusAgentResult> {
   const { text, context, media } = input
 
+  // Safe internal indicator — counts only, never raw memory text.
+  if (context.importedMemory) {
+    console.log(`[xodus] context: importedMemory active=${context.importedMemory.current.length} inactive=${context.importedMemory.inactiveCount}`)
+  }
+
   // Media without an extraction path → pending review.
   // (We still let the AI generate a reply, but ensure the media isn't silently dropped.)
   const mediaPending: SavePendingReviewAction[] = []
@@ -370,12 +410,19 @@ export async function routeXodusInput(input: XodusRouteInput): Promise<XodusAgen
   let aiResult: { reply: string; actions: XodusAction[]; confidence: number; warnings: string[] } | null = null
 
   try {
+    const channelHint =
+      input.source === 'telegram'
+        ? 'Channel: telegram — text-message style, tight, interactive. He is texting you on his phone.'
+        : input.source === 'web_chat'
+          ? 'Channel: web_chat — slightly fuller is OK, still tight.'
+          : `Channel: ${input.source} — keep it tight and conversational.`
+
     const aiResponse = await callAI({
       systemPrompt:   SYSTEM_PROMPT,
-      userMessage:    `${summarizeContext(context)}\n\nUser (${input.source}): ${text}`,
+      userMessage:    `${summarizeContext(context)}\n${channelHint}\n\nUser (${input.source}): ${text}`,
       responseFormat: 'json',
       maxTokens:      700,
-      temperature:    0.25,
+      temperature:    0.35,
     })
     aiResult = parseAIResponse(aiResponse.text)
   } catch {

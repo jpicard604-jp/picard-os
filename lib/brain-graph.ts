@@ -15,6 +15,7 @@ import { getTodayGoals } from './daily-goals'
 import { getNutritionProfile } from './nutrition-profile'
 import { getRecentNotes } from './xodus/notes'
 import { getXodusMemoryRecords } from './xodus/memory'
+import { getImportedRecords } from './xodus/memory-imports'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -35,7 +36,7 @@ export interface BrainGraphNode {
   source?:  string     // 'system' | 'localStorage' | 'obsidian' | 'ai' | 'memory'
   // Memory node metadata — only set on type:'memory' nodes
   memoryCategory?:  string
-  memoryStatus?:    'current' | 'historical' | 'needs_confirmation'
+  memoryStatus?:    'current' | 'historical' | 'needs_confirmation' | 'needs_review' | 'paused' | 'outdated'
   memoryConfidence?: 'high' | 'medium' | 'low'
   memoryFilePath?:  string
 }
@@ -177,15 +178,27 @@ function edge(source: string, target: string, type?: string, strength = 0.5): Br
 }
 
 const SYSTEM_NODES: BrainGraphNode[] = [
-  makeNode({ id: HUB_ID,            label: 'Picard OS',   type: 'system',    size: 22, source: 'system', summary: 'Personal operating system hub' }),
-  makeNode({ id: 'hub-xodus',       label: 'XODUS',       type: 'xodus',     size: 16, source: 'system', summary: 'AI intelligence and intake layer' }),
-  makeNode({ id: 'hub-fitness',     label: 'Fitness',     type: 'fitness',   size: 14, source: 'system', summary: 'Workouts, recovery, and body metrics' }),
-  makeNode({ id: 'hub-nutrition',   label: 'Nutrition',   type: 'nutrition', size: 14, source: 'system', summary: 'Macros, calorie targets, and diet phase' }),
-  makeNode({ id: 'hub-projects',    label: 'Projects',    type: 'project',   size: 14, source: 'system', summary: 'Active projects and tasks' }),
-  makeNode({ id: 'hub-daily',       label: 'Daily',       type: 'daily',     size: 14, source: 'system', summary: 'Daily logs and metrics timeline' }),
-  makeNode({ id: 'hub-whoop',       label: 'WHOOP',       type: 'system',    size: 12, source: 'system', summary: 'Wearable recovery and strain data' }),
-  makeNode({ id: 'hub-daily-goals', label: 'Goals',       type: 'task',      size: 12, source: 'system', summary: 'Daily goal planning and intent capture' }),
-  makeNode({ id: 'hub-obsidian',    label: 'Neural Vault',type: 'obsidian',  size: 12, source: 'system', summary: 'Obsidian-style knowledge vault (coming soon)' }),
+  makeNode({ id: HUB_ID,            label: 'Picard OS',   type: 'system',    size: 22, source: 'system', summary: 'Personal operating system hub — control center / interface.' }),
+  makeNode({ id: 'hub-xodus',       label: 'XODUS',       type: 'xodus',     size: 16, source: 'system', summary: 'AI operator — DeepSeek-powered chat + intake layer.' }),
+  makeNode({ id: 'hub-fitness',     label: 'Fitness',     type: 'fitness',   size: 14, source: 'system', summary: 'Workouts, recovery, and body metrics.' }),
+  makeNode({ id: 'hub-nutrition',   label: 'Nutrition',   type: 'nutrition', size: 14, source: 'system', summary: 'Macros, calorie targets, and diet phase.' }),
+  makeNode({ id: 'hub-projects',    label: 'Projects',    type: 'project',   size: 14, source: 'system', summary: 'Active projects and tasks.' }),
+  makeNode({ id: 'hub-daily',       label: 'Daily',       type: 'daily',     size: 14, source: 'system', summary: 'Daily logs and metrics timeline.' }),
+  makeNode({ id: 'hub-whoop',       label: 'WHOOP',       type: 'system',    size: 12, source: 'system', summary: 'Wearable recovery / HRV / strain integration.' }),
+  makeNode({ id: 'hub-daily-goals', label: 'Goals',       type: 'task',      size: 12, source: 'system', summary: 'Daily goal planning and intent capture.' }),
+  makeNode({ id: 'hub-obsidian',    label: 'Obsidian Brain', type: 'obsidian',  size: 14, source: 'system', summary: 'Long-term brain / archive. Picard OS is the interface; Obsidian is the durable memory.' }),
+
+  // Concept / system nodes added in the Neural Link MVP
+  makeNode({ id: 'hub-deepseek',          label: 'DeepSeek',              type: 'xodus',     size: 11, source: 'system', summary: 'DeepSeek-powered XODUS brain. Replaces deterministic-router design.' }),
+  makeNode({ id: 'hub-claude-code',       label: 'Claude Code',           type: 'system',    size: 9,  source: 'system', summary: 'Dev workflow — inspect-first, plan-mode, no audit fix.' }),
+  makeNode({ id: 'hub-claude-design',     label: 'Claude Design',         type: 'system',    size: 9,  source: 'system', summary: 'UI/UX design inspiration source.' }),
+  makeNode({ id: 'hub-apple-health',      label: 'Apple Health',          type: 'system',    size: 10, source: 'system', summary: 'HealthKit / iOS Shortcut intake. Manual ZIP export is fallback only.' }),
+  makeNode({ id: 'hub-supabase',          label: 'Supabase',              type: 'system',    size: 10, source: 'system', summary: 'Operational memory layer (localStorage now → Supabase later).' }),
+  makeNode({ id: 'hub-voice-intake',      label: 'Voice Intake',          type: 'system',    size: 9,  source: 'system', summary: 'Voice → transcript → notes / actions.' }),
+  makeNode({ id: 'hub-screenshot-intake', label: 'Screenshot / API Intake', type: 'system',  size: 9,  source: 'system', summary: 'Capture preference: screenshot + API > manual forms.' }),
+  makeNode({ id: 'hub-mood',              label: 'Mood / Mental Check-In', type: 'daily',    size: 10, source: 'system', summary: 'Self-check on a 0–100 scale. Stored on DailyLog.mentalScore.' }),
+  makeNode({ id: 'hub-productivity',      label: 'Productivity Graph',    type: 'daily',     size: 9,  source: 'system', summary: 'Future graph driven by workouts, stimulants, recovery, calendar, workload, health.' }),
+  makeNode({ id: 'hub-chatgpt-import',    label: 'ChatGPT Memory Import', type: 'memory',    size: 10, source: 'system', summary: 'Source of the imported memory seed currently active in XODUS.' }),
 ]
 
 const SYSTEM_EDGES: BrainGraphEdge[] = [
@@ -205,7 +218,37 @@ const SYSTEM_EDGES: BrainGraphEdge[] = [
   edge('hub-whoop',     'hub-fitness',     'data',     0.8),
   edge('hub-nutrition', 'hub-daily',       'data',     0.6),
   edge('hub-fitness',   'hub-daily',       'data',     0.4),
+
+  // Concept / MVP edges
+  edge('hub-xodus',          'hub-deepseek',           'core',     0.95),
+  edge(HUB_ID,               'hub-claude-code',        'semantic', 0.4),
+  edge(HUB_ID,               'hub-claude-design',      'semantic', 0.35),
+  edge('hub-fitness',        'hub-apple-health',       'data',     0.6),
+  edge('hub-daily',          'hub-apple-health',       'data',     0.55),
+  edge(HUB_ID,               'hub-supabase',           'data',     0.6),
+  edge('hub-xodus',          'hub-voice-intake',       'intake',   0.6),
+  edge('hub-xodus',          'hub-screenshot-intake',  'intake',   0.55),
+  edge('hub-daily',          'hub-mood',               'data',     0.7),
+  edge('hub-xodus',          'hub-mood',               'context',  0.4),
+  edge(HUB_ID,               'hub-productivity',       'data',     0.55),
+  edge('hub-fitness',        'hub-productivity',       'data',     0.5),
+  edge('hub-mood',           'hub-productivity',       'data',     0.45),
+  edge('hub-xodus',          'hub-chatgpt-import',     'memory',   0.7),
+  edge('hub-obsidian',       'hub-chatgpt-import',     'memory',   0.6),
 ]
+
+// Categories of imported memory → graph hub they should anchor near.
+const IMPORT_CATEGORY_TO_HUB: Record<string, string> = {
+  identity:   'hub-xodus',
+  fitness:    'hub-fitness',
+  project:    'hub-projects',
+  preference: 'hub-xodus',
+  workflow:   'hub-xodus',
+  goal:       'hub-daily-goals',
+  person:     'hub-xodus',
+  backlog:    'hub-projects',
+  outdated:   'hub-chatgpt-import',
+}
 
 // ─── Data builder ─────────────────────────────────────────────────────────────
 
@@ -338,6 +381,66 @@ export function buildBrainGraph(): BrainGraphData {
     })
     addEdge(edge('hub-nutrition', 'nutrition-profile', 'profile', 0.9))
     addEdge(edge('hub-xodus',     'nutrition-profile', 'context', 0.3))
+  }
+
+  // ── Daily check-in snapshot — today's mental + energy as data nodes ───────
+  const todayKey = new Date().toISOString().slice(0, 10)
+  const todayLog = allLogs[todayKey]
+  if (todayLog && todayLog.mentalScore !== null && todayLog.mentalScore !== undefined) {
+    const id = 'mood-today'
+    addNode({
+      id,
+      label: `Mental ${todayLog.mentalScore}/100`,
+      type: 'daily',
+      size: 8,
+      summary: `Today's mental check-in: ${todayLog.mentalScore}/100${todayLog.mentalScoreUpdatedAt ? ` · ${new Date(todayLog.mentalScoreUpdatedAt).toLocaleTimeString()}` : ''}`,
+      date: todayKey,
+      source: 'localStorage',
+    })
+    addEdge(edge('hub-mood', id, 'data', 0.8))
+  }
+  if (todayLog && todayLog.energyScore !== null && todayLog.energyScore !== undefined) {
+    const id = 'energy-today'
+    addNode({
+      id,
+      label: `Energy ${todayLog.energyScore}/10`,
+      type: 'daily',
+      size: 8,
+      summary: `Today's energy check-in: ${todayLog.energyScore}/10${todayLog.energyScoreUpdatedAt ? ` · ${new Date(todayLog.energyScoreUpdatedAt).toLocaleTimeString()}` : ''}`,
+      date: todayKey,
+      source: 'localStorage',
+    })
+    addEdge(edge('hub-mood', id, 'data', 0.7))
+    addEdge(edge('hub-fitness', id, 'data', 0.45))
+  }
+
+  // ── Imported memory nodes (from picard_xodus_memory_imports_v1) ───────────
+  const imported = getImportedRecords()
+  for (const r of imported) {
+    const id = `import-${r.id}`
+    // Map import status → BrainGraphNode.memoryStatus (rendering can dim
+    // non-current nodes). Don't conflate with the legacy 'historical'.
+    const mappedStatus =
+      r.status === 'current'      ? 'current'
+      : r.status === 'needs_review' ? 'needs_review'
+      : r.status === 'paused'       ? 'paused'
+      : 'outdated'
+    addNode({
+      id,
+      label: r.title.length > 36 ? r.title.slice(0, 36) + '…' : r.title,
+      type: 'memory',
+      size: r.status === 'current' ? 9 : 7,
+      summary: r.content,
+      source: r.source,
+      memoryCategory:  r.category,
+      memoryStatus:    mappedStatus,
+      memoryConfidence: r.confidence,
+    })
+    addEdge(edge('hub-chatgpt-import', id, 'memory', r.status === 'current' ? 0.55 : 0.3))
+    const anchor = IMPORT_CATEGORY_TO_HUB[r.category] ?? 'hub-xodus'
+    if (anchor !== 'hub-chatgpt-import') {
+      addEdge(edge(anchor, id, 'memory', r.status === 'current' ? 0.5 : 0.25))
+    }
   }
 
   // ── XODUS memory nodes (curated static records from memory/ files) ─────────

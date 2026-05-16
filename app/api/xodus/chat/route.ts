@@ -12,7 +12,7 @@
 // directly with the appropriate `source` value.
 
 import { NextResponse } from 'next/server'
-import { routeXodusInput } from '@/lib/xodus/brain-router'
+import { generateXodusResponse } from '@/lib/xodus/server-chat'
 import { computeReadiness } from '@/lib/xodus/readiness'
 import type {
   XodusChatContext,
@@ -93,12 +93,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'message is required' }, { status: 400 })
   }
 
-  const agent = await routeXodusInput({
-    text:    message,
+  const response = await generateXodusResponse({
+    message,
     source:  'web_chat',
     context,
     media,
   })
+  const agent = response.agent
 
   // Build legacy actions list for the existing chip renderer.
   const legacyActions: XodusChatAction[] = []

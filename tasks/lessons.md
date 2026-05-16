@@ -81,3 +81,18 @@ Reusable rules distilled from mistakes or user corrections. Claude Code reviews 
 **Rule:** XODUS long-term memory should be stored as a vault of linked Markdown files (each record = one node with `[[wiki-links]]`), not only as Supabase rows or single flat exports. The vault compounds over time: new knowledge auto-links to old knowledge, enabling XODUS to have persistent cross-session context.
 **Why:** AI assistants forget everything between sessions. The Obsidian-inspired vault gives XODUS a queryable knowledge base it can read at session start. `lib/obsidian-export.ts` is a good one-time export but not a living brain — the vault is a separate system.
 **Apply when:** Building `/brain`, brain_notes Supabase table, hot-cache generation, or any XODUS memory feature. See `docs/obsidian-brain-guide.md` for the full architecture. Do not conflate the flat Markdown export with the interactive vault.
+
+### [2026-05-16] One server function powers every XODUS surface
+**Rule:** Web chat, Telegram, future mobile/voice/SMS surfaces all call a single server-side helper (`lib/xodus/server-chat.ts → generateXodusResponse`). Surface-specific code only handles transport (parsing the inbound request, sending the outbound reply). No surface should call `callAI()` or `routeXodusInput()` directly anymore.
+**Why:** Without a single brain function, every new surface drifts — different prompts, different context shapes, different intent vocab. We had two parallel paths (web `/api/xodus/chat` and Telegram webhook) both calling `routeXodusInput` with slightly different surfacing logic. Consolidating prevents that drift.
+**Apply when:** Adding a new XODUS input channel (mobile app, SMS, IFTTT, voice). Build a thin transport layer around `generateXodusResponse()` — never duplicate prompt or context-build logic.
+
+### [2026-05-16] Server routes can't read browser localStorage — fail honestly
+**Rule:** Server routes (Telegram webhook, cron, scheduled functions) have no access to browser localStorage. When building XODUS context server-side, return a conservative fallback (profile constants + missing-data signal) rather than pretending. Do not claim to have saved data that wasn't actually written.
+**Why:** Picard OS's operational memory currently lives in localStorage. Telegram runs on Vercel and sees zero of that. Hacking "fake context" creates a worse experience than honest "I don't know your daily log yet."
+**Apply when:** Adding any server-side feature that needs user state. Either (a) mirror state into Supabase first, then read on the server, or (b) accept the limitation explicitly and surface it via `missingDataSignals` in the context.
+
+### [2026-05-16] XODUS is conversation-first; classification is silent
+**Rule:** XODUS replies must sound like a person — never "Intent recognized", "Tasks recognized:", or "No action saved". Classification and action emission happen in the background. The reply is for Jackson, not for the system. When persistence for a category isn't wired, mention it briefly only when relevant, never as a tail on every reply.
+**Why:** Telegram replies that looked like form receipts felt like a parsing bot. The goal is a real AI operator — texting Jackson like a chief of staff who happens to know his system.
+**Apply when:** Editing any XODUS prompt, fallback, mock, or response surface (web, Telegram, future channels). Channel-aware styling lives in the system prompt; transport routes just relay the reply.

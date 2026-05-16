@@ -630,3 +630,40 @@ WHOOP_REDIRECT_URI=        # e.g. http://localhost:3000/api/integrations/whoop/c
 **Result:** Operating rules prepended to CLAUDE.md. Both task files created. No app code touched.
 
 **Files changed:** `CLAUDE.md`, `tasks/todo.md` (new), `tasks/lessons.md` (new)
+
+---
+
+## [2026-05-16] XODUS Telegram Chat — make Telegram a real AI surface
+
+**Status:** in progress
+
+**Plan:**
+- [x] Inspect existing Telegram webhook, agent route, AI provider, brain router
+- [x] Create shared server-side helper `lib/xodus/server-chat.ts` exposing `generateXodusResponse()`
+- [x] Refactor `app/api/telegram/webhook` to use shared helper + handle `/start`, `/help`
+- [x] Drop dumb "Open /xodus" tail when there are no pending-review actions
+- [x] Route `app/api/xodus/chat` through the same shared helper for parity
+- [x] Run npm run build — green
+- [ ] Mirror localStorage data into Supabase so Telegram has cross-device context
+- [ ] Add real task/goal/note/reminder persistence from Telegram intents
+- [ ] Add reminder scheduling (cron / Supabase scheduled function)
+- [ ] Add voice message transcription (Whisper)
+- [ ] Add screenshot / image intake (vision model)
+
+**Result:** Telegram and web chat now share `generateXodusResponse()`. Both pass through `routeXodusInput()` → `callAI()`. Telegram replies are conversational by default; only show the inbox tail when there are actually pending-review actions. Slash commands handled inline. Server-side context is a conservative fallback until Supabase mirroring lands.
+
+---
+
+## [2026-05-16] XODUS Telegram — conversational first
+
+**Status:** in progress
+
+**Plan:**
+- [x] Rewrite SYSTEM_PROMPT in `lib/xodus/brain-router.ts` to be conversation-first, no robotic phrases, no false saves
+- [x] Inject channel hint (`telegram` vs `web_chat`) into the user message so the model adapts tone
+- [x] Soften rule-based fallback replies in `lib/xodus/fallback-router.ts`
+- [x] Make `lib/ai/provider.ts` mock return a conversational reply field
+- [x] Run npm run build — green
+- [ ] Recent-message conversation memory for Telegram (read last N xodus_inbox items by chat_id, pass into context)
+- [ ] Add persistence for goals / tasks / notes / daily logs / reminders from Telegram
+- [ ] Supabase-backed server context so Telegram can read real daily / project / fitness data

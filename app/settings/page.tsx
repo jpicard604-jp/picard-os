@@ -1,10 +1,22 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Download, Upload, Trash2, CheckCircle2, AlertTriangle, HardDrive, FileText, RotateCcw, Zap, RefreshCw, Link2, Heart, Send } from 'lucide-react'
+import { Download, Upload, Trash2, CheckCircle2, AlertTriangle, HardDrive, FileText, RotateCcw, Zap, RefreshCw, Link2, Heart, Send, Brain, ChevronDown } from 'lucide-react'
 import { STORAGE_KEYS, setStorage, resetStorageKey, validateStorageKey, getTodayLog, saveTodayLog, emptyLog, getTodayKey } from '@/lib/storage'
-import { downloadObsidianExport, downloadXodusObsidianExport } from '@/lib/obsidian-export'
+import { downloadObsidianExport, downloadXodusObsidianExport, downloadVaultZip } from '@/lib/obsidian-export'
 import type { WhoopDailySync } from '@/lib/whoop/types'
+import {
+  parseSeedJson,
+  getImportedRecords,
+  setImportedRecords,
+  clearImportedRecords,
+  importCurrentOnly,
+  persistNonCurrentForVisibility,
+  statusBreakdown,
+  type XodusMemoryImport,
+  type StatusBreakdown,
+} from '@/lib/xodus/memory-imports'
+import { useWhoopAutoSync, WHOOP_AUTO_SYNC_TIMESTAMP_KEY } from '@/hooks/useWhoopAutoSync'
 
 /* ─── Backup manifest — every key included in export/import/clear ────────────── */
 const BACKUP_MANIFEST = [
@@ -63,6 +75,10 @@ function fmtRel(iso: string | null): string {
 
 /* ─── Page ───────────────────────────────────────────────────────────────────── */
 export default function SettingsPage() {
+  // Fire one WHOOP auto-sync attempt on Settings mount (guarded by timestamp).
+  const whoopAuto = useWhoopAutoSync()
+  void WHOOP_AUTO_SYNC_TIMESTAMP_KEY // keep the import referenced for tooling
+
   const [meta, setMeta] = useState<Meta>({
     lastExport: null, lastImport: null, lastClear: null, importVersion: null,
   })
@@ -84,6 +100,24 @@ export default function SettingsPage() {
     inbox: { ready: boolean; reason: string | null }
   } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const seedFileRef = useRef<HTMLInputElement>(null)
+
+  /* ── XODUS Memory Imports state ────────────────────────────────────────── */
+  const [storedImports, setStoredImports] = useState<XodusMemoryImport[]>([])
+  const [storedBreakdown, setStoredBreakdown] = useState<StatusBreakdown>({ total: 0, current: 0, needs_review: 0, paused: 0, outdated: 0 })
+  const [preview, setPreview] = useState<{
+    records: XodusMemoryImport[]
+    breakdown: StatusBreakdown
+    skipped: number
+    fileName: string
+  } | null>(null)
+  const [importsClearStep, setImportsClearStep] = useState<'idle' | 'confirm'>('idle')
+
+  const refreshImports = useCallback(() => {
+    const records = getImportedRecords()
+    setStoredImports(records)
+    setStoredBreakdown(statusBreakdown(records))
+  }, [])
 
   const refreshStats = useCallback(() => {
     setStats(readKeyStats())
@@ -141,6 +175,7 @@ export default function SettingsPage() {
     } catch {}
 
     refreshStats()
+    refreshImports()
     void fetchWhoopStatus()
     void fetchAppleHealthStatus()
     void fetchTelegramStatus()
@@ -164,7 +199,55 @@ export default function SettingsPage() {
       else if (whoopParam === 'state_mismatch') toast$('OAuth state mismatch — try connecting again', false)
       else if (whoopParam === 'error') toast$('WHOOP connection failed — check server logs', false)
     }
-  }, [refreshStats, fetchWhoopStatus, fetchAppleHealthStatus, fetchTelegramStatus])
+  }, [refreshStats, refreshImports, fetchWhoopStatus, fetchAppleHealthStatus, fetchTelegramStatus])
+
+  /* ── XODUS Memory Imports handlers ────────────────────────────────────── */
+  function handleSeedPreview(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (evt) => {
+      const text = String(evt.target?.result ?? '')
+      const result = parseSeedJson(text)
+      if (!result.ok) {
+        toast$(result.error ?? 'Could not parse seed file', false)
+        return
+      }
+      setPreview({
+        records: result.records,
+        breakdown: statusBreakdown(result.records),
+        skipped: result.skipped,
+        fileName: file.name,
+      })
+      toast$(`Loaded ${result.records.length} record${result.records.length !== 1 ? 's' : ''} for preview`)
+    }
+    reader.readAsText(file)
+    e.target.value = ''
+  }
+
+  function handleImportCurrent() {
+    if (!preview) return
+    const existing = getImportedRecords()
+    const mergeCurrent = importCurrentOnly(preview.records, existing)
+    const withNonCurrent = persistNonCurrentForVisibility(preview.records, mergeCurrent.merged)
+    setImportedRecords(withNonCurrent)
+    refreshImports()
+    setPreview(null)
+    toast$(`Imported ${mergeCurrent.added} current · ${mergeCurrent.skipped} already present · ${mergeCurrent.ignoredByStatus} not current`)
+  }
+
+  function handleClearImports() {
+    if (importsClearStep === 'idle') {
+      setImportsClearStep('confirm')
+      setTimeout(() => setImportsClearStep('idle'), 4000)
+      return
+    }
+    clearImportedRecords()
+    setImportsClearStep('idle')
+    setPreview(null)
+    refreshImports()
+    toast$('Staged XODUS memory imports cleared')
+  }
 
   function saveMeta(next: Meta) {
     setMeta(next)
@@ -191,6 +274,20 @@ export default function SettingsPage() {
       toast$('XODUS Memory & Notes downloaded')
     } catch {
       toast$('Failed to generate XODUS export', false)
+    }
+  }
+
+  const [vaultZipLoading, setVaultZipLoading] = useState(false)
+  async function handleVaultZipExport() {
+    if (vaultZipLoading) return
+    setVaultZipLoading(true)
+    try {
+      await downloadVaultZip()
+      toast$('Vault ZIP downloaded')
+    } catch {
+      toast$('Failed to generate Vault ZIP', false)
+    } finally {
+      setVaultZipLoading(false)
     }
   }
 
@@ -377,6 +474,153 @@ export default function SettingsPage() {
 
       <div className="px-4 lg:px-6 pt-6 space-y-5 lg:max-w-2xl">
 
+        {/* ── XODUS Memory Imports (moved to top for visibility) ──────────── */}
+        <section>
+          <p className="section-title mb-3">XODUS Memory Imports</p>
+          <p className="text-[12px] text-zinc-500 mb-3 leading-relaxed">
+            Upload <code className="font-mono text-[11px] text-zinc-400">xodus-memory-seed.json</code> from <code className="font-mono text-[11px] text-zinc-400">exports/chatgpt-memory-import/</code>.
+          </p>
+          <div className="rounded-2xl bg-[--surface] border border-white/[0.06] card-elevated overflow-hidden">
+
+            <div className="flex items-start gap-4 px-5 py-4 border-b border-white/[0.04]">
+              <div className="flex-shrink-0 mt-0.5">
+                <div className={`w-2 h-2 rounded-full ${storedBreakdown.current > 0 ? 'bg-green-400' : 'bg-zinc-700'}`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[14px] text-zinc-200 font-medium flex items-center gap-2">
+                  <Brain size={13} className="text-violet-400" strokeWidth={2.5} />
+                  Staged imports from AI exports
+                </p>
+                <p className="text-[12px] mt-0.5 text-zinc-600 leading-relaxed">
+                  Preview a <code className="font-mono text-[11px] text-zinc-500">xodus-memory-seed.json</code> file, then import only <code className="font-mono text-[11px] text-zinc-500">status: current</code> records.
+                  Existing XODUS memory is never overwritten.
+                </p>
+                {storedBreakdown.total > 0 && (
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-mono text-zinc-500">
+                    <span><span className="text-zinc-300">{storedBreakdown.total}</span> stored</span>
+                    <span className="text-zinc-700">·</span>
+                    <span className="text-green-300/90">{storedBreakdown.current} current</span>
+                    <span className="text-zinc-700">·</span>
+                    <span className="text-amber-300/80">{storedBreakdown.needs_review} needs_review</span>
+                    <span className="text-zinc-700">·</span>
+                    <span className="text-zinc-500">{storedBreakdown.paused} paused</span>
+                    <span className="text-zinc-700">·</span>
+                    <span className="text-zinc-500">{storedBreakdown.outdated} outdated</span>
+                  </div>
+                )}
+                {storedBreakdown.total === 0 && (
+                  <p className="text-[11px] font-mono text-zinc-700 mt-1.5">No imports staged yet.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4 px-5 py-4 border-b border-white/[0.04]">
+              <div className="flex-1 min-w-0">
+                <p className="text-[14px] text-zinc-200 font-medium">Preview seed file</p>
+                <p className="text-[12px] text-zinc-600 mt-0.5 leading-relaxed">
+                  Select a JSON seed (e.g. <code className="font-mono text-[11px]">exports/chatgpt-memory-import/xodus-memory-seed.json</code>). Nothing is saved until you import.
+                </p>
+              </div>
+              <button
+                onClick={() => seedFileRef.current?.click()}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/[0.09] text-zinc-300 text-[13px] font-medium hover:bg-white/[0.09] active:scale-[0.98] transition-all flex-shrink-0"
+              >
+                <Upload size={14} strokeWidth={2} />
+                Preview .json
+              </button>
+              <input
+                ref={seedFileRef}
+                type="file"
+                accept=".json,application/json"
+                onChange={handleSeedPreview}
+                className="hidden"
+              />
+            </div>
+
+            {preview && (
+              <div className="px-5 py-4 border-b border-white/[0.04] bg-white/[0.015]">
+                <p className="text-[12px] text-zinc-400 mb-2">
+                  Preview · <span className="font-mono text-zinc-500">{preview.fileName}</span>
+                  {preview.skipped > 0 && (
+                    <span className="text-amber-400/80"> · skipped {preview.skipped} malformed record{preview.skipped !== 1 ? 's' : ''}</span>
+                  )}
+                </p>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-mono text-zinc-500 mb-3">
+                  <span><span className="text-zinc-300">{preview.breakdown.total}</span> total</span>
+                  <span className="text-zinc-700">·</span>
+                  <span className="text-green-300/90">{preview.breakdown.current} current</span>
+                  <span className="text-zinc-700">·</span>
+                  <span className="text-amber-300/80">{preview.breakdown.needs_review} needs_review</span>
+                  <span className="text-zinc-700">·</span>
+                  <span className="text-zinc-500">{preview.breakdown.paused} paused</span>
+                  <span className="text-zinc-700">·</span>
+                  <span className="text-zinc-500">{preview.breakdown.outdated} outdated</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={handleImportCurrent}
+                    disabled={preview.breakdown.current === 0}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-500/[0.10] border border-violet-500/25 text-violet-200 text-[13px] font-medium hover:bg-violet-500/[0.16] active:scale-[0.98] transition-all disabled:opacity-40 disabled:pointer-events-none"
+                  >
+                    <Brain size={14} strokeWidth={2} />
+                    Import {preview.breakdown.current} current
+                  </button>
+                  <button
+                    onClick={() => setPreview(null)}
+                    className="px-4 py-2.5 rounded-xl border border-white/[0.08] text-zinc-400 text-[13px] font-medium hover:bg-white/[0.03] hover:border-white/[0.13] transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                <p className="text-[11px] font-mono text-zinc-700 mt-2">
+                  Only <span className="text-green-300/80">status: current</span> records are activated. Other records are stored for visibility but not used by XODUS.
+                </p>
+              </div>
+            )}
+
+            {storedImports.length > 0 && (
+              <div className="px-5 py-3 border-b border-white/[0.04]">
+                <p className="text-[11px] font-mono text-zinc-700 mb-1.5">Most recent imports</p>
+                <ul className="space-y-1">
+                  {storedImports
+                    .filter(r => r.status === 'current')
+                    .slice(0, 5)
+                    .map(r => (
+                      <li key={r.id} className="text-[12px] text-zinc-400 truncate">
+                        <span className="font-mono text-[10px] text-zinc-600 mr-2">{r.category}</span>
+                        {r.title}
+                      </li>
+                    ))}
+                  {storedImports.filter(r => r.status === 'current').length === 0 && (
+                    <li className="text-[12px] text-zinc-600">No current records imported yet.</li>
+                  )}
+                </ul>
+              </div>
+            )}
+
+            <div className="flex items-center gap-4 px-5 py-3.5">
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] text-zinc-300 font-medium">Clear staged imports</p>
+                <p className="text-[11px] text-zinc-600 mt-0.5">
+                  Removes all records under <code className="font-mono">picard_xodus_memory_imports_v1</code>. Does not affect curated XODUS memory.
+                </p>
+              </div>
+              <button
+                onClick={handleClearImports}
+                disabled={storedBreakdown.total === 0 && importsClearStep === 'idle'}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-[12px] font-medium transition-all flex-shrink-0 ${
+                  importsClearStep === 'confirm'
+                    ? 'bg-red-500/[0.14] border border-red-500/30 text-red-300'
+                    : 'border border-white/[0.07] text-zinc-500 hover:border-red-500/25 hover:text-red-400 disabled:opacity-30 disabled:pointer-events-none'
+                }`}
+              >
+                <Trash2 size={12} strokeWidth={2} />
+                {importsClearStep === 'confirm' ? 'Click again to confirm' : 'Clear'}
+              </button>
+            </div>
+          </div>
+        </section>
+
         {/* ── Integrations ─────────────────────────────────────────────────── */}
         <section>
           <p className="section-title mb-3">Integrations</p>
@@ -405,7 +649,7 @@ export default function SettingsPage() {
                   {whoopConnected === null
                     ? 'Checking status…'
                     : whoopConnected
-                      ? `Connected${whoopLastSync ? ` · Last sync ${fmtRel(whoopLastSync)}` : ''}`
+                      ? `Connected${whoopLastSync ? ` · Last sync ${fmtRel(whoopLastSync)}` : ''}${whoopAuto.lastAttemptAt ? ` · Auto-sync ${fmtRel(whoopAuto.lastAttemptAt)} (${whoopAuto.lastStatus ?? '—'})` : ''}`
                       : whoopReason === 'table_missing'
                         ? 'Setup required — create whoop_tokens table in Supabase (see docs § 7)'
                         : whoopReason === 'db_error'
@@ -526,94 +770,131 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* ── Backup & Export ──────────────────────────────────────────────── */}
+        {/* ── Data, Memory & Exports ───────────────────────────────────────── */}
         <section>
-          <p className="section-title mb-3">Backup & Data</p>
-          <div className="rounded-2xl bg-[--surface] border border-white/[0.06] card-elevated overflow-hidden">
-            {/* Export */}
-            <div className="flex items-center gap-4 px-5 py-4 border-b border-white/[0.04]">
-              <div className="flex-1 min-w-0">
-                <p className="text-[14px] text-zinc-200 font-medium">Export Backup</p>
-                <p className="text-[12px] text-zinc-600 mt-0.5 leading-relaxed">
-                  Download all Picard OS data as a single JSON file
-                </p>
-              </div>
-              <button
-                onClick={handleExport}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-cyan-400 text-white text-[13px] font-semibold hover:opacity-90 active:scale-[0.98] transition-all flex-shrink-0"
-              >
-                <Download size={14} strokeWidth={2.5} />
-                Export
-              </button>
-            </div>
+          <p className="section-title mb-3">Data, Memory & Exports</p>
 
-            {/* Import */}
-            <div className="flex items-center gap-4 px-5 py-4 border-b border-white/[0.04]">
-              <div className="flex-1 min-w-0">
-                <p className="text-[14px] text-zinc-200 font-medium">Import Backup</p>
-                <p className="text-[12px] text-zinc-600 mt-0.5 leading-relaxed">
-                  Restore all data from a previously exported JSON file
-                </p>
+          {/* Obsidian Exports — most-used, expanded by default */}
+          <details open className="rounded-2xl bg-[--surface] border border-white/[0.06] card-elevated overflow-hidden mb-3">
+            <summary className="cursor-pointer list-none px-5 py-3 flex items-center justify-between text-[12px] font-mono uppercase tracking-[0.14em] text-zinc-500 hover:text-zinc-300">
+              <span>Obsidian Exports</span>
+              <ChevronDown size={12} strokeWidth={2} className="text-zinc-700" />
+            </summary>
+            <div className="border-t border-white/[0.04]">
+              {/* Vault ZIP — first because it's the most common */}
+              <div className="flex items-center gap-4 px-5 py-4 border-b border-white/[0.04]">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[14px] text-zinc-200 font-medium">Vault ZIP</p>
+                  <p className="text-[12px] text-zinc-600 mt-0.5 leading-relaxed">
+                    Create a multi-file Obsidian staging export.
+                  </p>
+                </div>
+                <button
+                  onClick={handleVaultZipExport}
+                  disabled={vaultZipLoading}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/[0.08] border border-emerald-500/20 text-emerald-300 text-[13px] font-medium hover:bg-emerald-500/[0.14] active:scale-[0.98] transition-all flex-shrink-0 disabled:opacity-50 disabled:cursor-wait"
+                >
+                  <Download size={14} strokeWidth={2} />
+                  {vaultZipLoading ? 'Building…' : 'Export'}
+                </button>
               </div>
-              <button
-                onClick={() => fileRef.current?.click()}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/[0.09] text-zinc-300 text-[13px] font-medium hover:bg-white/[0.09] active:scale-[0.98] transition-all flex-shrink-0"
-              >
-                <Upload size={14} strokeWidth={2} />
-                Import
-              </button>
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".json,application/json"
-                onChange={handleImportFile}
-                className="hidden"
-              />
-            </div>
 
-            {/* Obsidian export — all logs */}
-            <div className="flex items-center gap-4 px-5 py-4 border-b border-white/[0.04]">
-              <div className="flex-1 min-w-0">
-                <p className="text-[14px] text-zinc-200 font-medium">Export Obsidian Markdown</p>
-                <p className="text-[12px] text-zinc-600 mt-0.5 leading-relaxed">
-                  All logs, projects, and voice notes as clean Markdown — ready for Obsidian
-                </p>
+              {/* XODUS Memory + Notes export */}
+              <div className="flex items-center gap-4 px-5 py-4 border-b border-white/[0.04]">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[14px] text-zinc-200 font-medium">XODUS Memory & Notes</p>
+                  <p className="text-[12px] text-zinc-600 mt-0.5 leading-relaxed">
+                    Export current XODUS memory and notes as Markdown.
+                  </p>
+                </div>
+                <button
+                  onClick={handleXodusObsidianExport}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-500/[0.08] border border-violet-500/20 text-violet-300 text-[13px] font-medium hover:bg-violet-500/[0.14] active:scale-[0.98] transition-all flex-shrink-0"
+                >
+                  <FileText size={14} strokeWidth={2} />
+                  Export .md
+                </button>
               </div>
-              <button
-                onClick={handleObsidianExport}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-500/[0.08] border border-cyan-500/20 text-cyan-300 text-[13px] font-medium hover:bg-cyan-500/[0.14] active:scale-[0.98] transition-all flex-shrink-0"
-              >
-                <FileText size={14} strokeWidth={2} />
-                Export .md
-              </button>
-            </div>
 
-            {/* XODUS Memory + Notes export */}
-            <div className="flex items-center gap-4 px-5 py-4">
-              <div className="flex-1 min-w-0">
-                <p className="text-[14px] text-zinc-200 font-medium">Export XODUS Memory & Notes</p>
-                <p className="text-[12px] text-zinc-600 mt-0.5 leading-relaxed">
-                  Memory records, notes, groceries, and daily goals — with Obsidian wiki-links
-                </p>
+              {/* Flat single-file Obsidian export — legacy */}
+              <div className="flex items-center gap-4 px-5 py-4">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[14px] text-zinc-200 font-medium">Flat Obsidian Export</p>
+                  <p className="text-[12px] text-zinc-600 mt-0.5 leading-relaxed">
+                    Legacy single-file export of logs / updates.
+                  </p>
+                </div>
+                <button
+                  onClick={handleObsidianExport}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-500/[0.08] border border-cyan-500/20 text-cyan-300 text-[13px] font-medium hover:bg-cyan-500/[0.14] active:scale-[0.98] transition-all flex-shrink-0"
+                >
+                  <FileText size={14} strokeWidth={2} />
+                  Export .md
+                </button>
               </div>
-              <button
-                onClick={handleXodusObsidianExport}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-500/[0.08] border border-violet-500/20 text-violet-300 text-[13px] font-medium hover:bg-violet-500/[0.14] active:scale-[0.98] transition-all flex-shrink-0"
-              >
-                <FileText size={14} strokeWidth={2} />
-                Export .md
-              </button>
             </div>
-          </div>
+          </details>
+
+          {/* Backup / Data Tools — collapsed by default */}
+          <details className="rounded-2xl bg-[--surface] border border-white/[0.06] card-elevated overflow-hidden mb-3">
+            <summary className="cursor-pointer list-none px-5 py-3 flex items-center justify-between text-[12px] font-mono uppercase tracking-[0.14em] text-zinc-500 hover:text-zinc-300">
+              <span>Backup / Data Tools</span>
+              <ChevronDown size={12} strokeWidth={2} className="text-zinc-700" />
+            </summary>
+            <div className="border-t border-white/[0.04]">
+              {/* Full Backup Export */}
+              <div className="flex items-center gap-4 px-5 py-4 border-b border-white/[0.04]">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[14px] text-zinc-200 font-medium">Export Full Backup</p>
+                  <p className="text-[12px] text-zinc-600 mt-0.5 leading-relaxed">
+                    Download all Picard OS data as a single JSON file.
+                  </p>
+                </div>
+                <button
+                  onClick={handleExport}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-cyan-400 text-white text-[13px] font-semibold hover:opacity-90 active:scale-[0.98] transition-all flex-shrink-0"
+                >
+                  <Download size={14} strokeWidth={2.5} />
+                  Export
+                </button>
+              </div>
+
+              {/* Import Backup */}
+              <div className="flex items-center gap-4 px-5 py-4">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[14px] text-zinc-200 font-medium">Import Full Backup</p>
+                  <p className="text-[12px] text-zinc-600 mt-0.5 leading-relaxed">
+                    Restore from a previously-exported Picard OS JSON file.
+                  </p>
+                </div>
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/[0.09] text-zinc-300 text-[13px] font-medium hover:bg-white/[0.09] active:scale-[0.98] transition-all flex-shrink-0"
+                >
+                  <Upload size={14} strokeWidth={2} />
+                  Import
+                </button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".json,application/json"
+                  onChange={handleImportFile}
+                  className="hidden"
+                />
+              </div>
+            </div>
+          </details>
         </section>
 
-        {/* ── Data Inventory ───────────────────────────────────────────────── */}
+        {/* ── Advanced / Debug — collapsed by default ──────────────────────── */}
         <section>
-          <div className="flex items-center justify-between mb-3">
-            <p className="section-title">Data Inventory</p>
-            <span className="text-[10px] font-mono text-zinc-700">{fmtBytes(totalBytes)} total</span>
-          </div>
-          <div className="rounded-2xl bg-[--surface] border border-white/[0.06] card-elevated overflow-hidden">
+          <p className="section-title mb-3">Advanced / Debug</p>
+          <details className="rounded-2xl bg-[--surface] border border-white/[0.06] card-elevated overflow-hidden mb-3">
+            <summary className="cursor-pointer list-none px-5 py-3 flex items-center justify-between text-[12px] font-mono uppercase tracking-[0.14em] text-zinc-500 hover:text-zinc-300">
+              <span>Data inventory <span className="text-zinc-700">· {fmtBytes(totalBytes)} total</span></span>
+              <ChevronDown size={12} strokeWidth={2} className="text-zinc-700" />
+            </summary>
+          <div className="border-t border-white/[0.04]">
             {BACKUP_MANIFEST.map(({ key, label, desc }, i) => {
               const stat = stats[i]
               const health = storageHealth[i]
@@ -672,33 +953,37 @@ export default function SettingsPage() {
               </span>
             </div>
           </div>
-        </section>
+          </details>
 
-        {/* ── History ──────────────────────────────────────────────────────── */}
-        <section>
-          <p className="section-title mb-3">History</p>
-          <div className="rounded-2xl bg-[--surface] border border-white/[0.06] card-elevated overflow-hidden">
-            {[
-              { label: 'Last export', value: fmtRel(meta.lastExport) },
-              {
-                label: 'Last import',
-                value: meta.lastImport
-                  ? `${fmtRel(meta.lastImport)}${meta.importVersion ? ` · v${meta.importVersion}` : ''}`
-                  : 'Never',
-              },
-              { label: 'Last clear', value: fmtRel(meta.lastClear) },
-            ].map(({ label, value }, i, arr) => (
-              <div
-                key={label}
-                className={`flex items-center justify-between px-5 py-3.5 ${
-                  i < arr.length - 1 ? 'border-b border-white/[0.04]' : ''
-                }`}
-              >
-                <span className="text-[12px] text-zinc-500">{label}</span>
-                <span className="text-[12px] font-mono text-zinc-400">{value}</span>
-              </div>
-            ))}
-          </div>
+          {/* History — also under Advanced */}
+          <details className="rounded-2xl bg-[--surface] border border-white/[0.06] card-elevated overflow-hidden">
+            <summary className="cursor-pointer list-none px-5 py-3 flex items-center justify-between text-[12px] font-mono uppercase tracking-[0.14em] text-zinc-500 hover:text-zinc-300">
+              <span>History</span>
+              <ChevronDown size={12} strokeWidth={2} className="text-zinc-700" />
+            </summary>
+            <div className="border-t border-white/[0.04]">
+              {[
+                { label: 'Last export', value: fmtRel(meta.lastExport) },
+                {
+                  label: 'Last import',
+                  value: meta.lastImport
+                    ? `${fmtRel(meta.lastImport)}${meta.importVersion ? ` · v${meta.importVersion}` : ''}`
+                    : 'Never',
+                },
+                { label: 'Last clear', value: fmtRel(meta.lastClear) },
+              ].map(({ label, value }, i, arr) => (
+                <div
+                  key={label}
+                  className={`flex items-center justify-between px-5 py-3.5 ${
+                    i < arr.length - 1 ? 'border-b border-white/[0.04]' : ''
+                  }`}
+                >
+                  <span className="text-[12px] text-zinc-500">{label}</span>
+                  <span className="text-[12px] font-mono text-zinc-400">{value}</span>
+                </div>
+              ))}
+            </div>
+          </details>
         </section>
 
         {/* ── Danger Zone ──────────────────────────────────────────────────── */}

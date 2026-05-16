@@ -7,12 +7,23 @@ import QuickStats from '@/components/dashboard/QuickStats'
 import ActivityOverview from '@/components/dashboard/ActivityOverview'
 import DailyGoals from '@/components/dashboard/DailyGoals'
 import StackPreview from '@/components/dashboard/StackPreview'
+import DailyCheckIn from '@/components/dashboard/DailyCheckIn'
+import WhoopAutoSync from '@/components/WhoopAutoSync'
 
 export default function DashboardPage() {
   return (
     <div className="p-4 lg:p-6 space-y-4">
-      {/* Hero strip — Today Overview + Score Rings */}
+      {/* Headless: kick off a guarded WHOOP auto-sync on dashboard mount */}
+      <WhoopAutoSync />
+
+      {/* First card of the day — mental + energy check-in. Collapses to a
+          compact "complete" strip once both are filled for today. */}
       <div className="animate-in" style={{ animationDelay: '0ms' }}>
+        <DailyCheckIn />
+      </div>
+
+      {/* Hero strip — Today Overview + Score Rings */}
+      <div className="animate-in" style={{ animationDelay: '60ms' }}>
         <CommandCenter />
       </div>
 

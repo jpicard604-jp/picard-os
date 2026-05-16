@@ -210,13 +210,17 @@ export default function BrainGraph() {
 
   function nodeOpacity(n: SimNode): number {
     if (!isFilterVisible(n)) return 0.06
-    if (!focusId) return 1
+    // Memory nodes that aren't current get dimmed so they read as inactive.
+    const dim =
+      n.memoryStatus === 'paused' || n.memoryStatus === 'outdated' || n.memoryStatus === 'historical' ? 0.45
+      : n.memoryStatus === 'needs_review' || n.memoryStatus === 'needs_confirmation' ? 0.7
+      : 1
+    if (!focusId) return dim
     if (n.id === focusId) return 1
-    if (neighbors?.has(n.id)) return 0.95
-    // Nodes that are merely close to cursor stay readable
+    if (neighbors?.has(n.id)) return 0.95 * dim
     const pf = proximityFactor(n)
-    if (pf > 0.15) return 0.4 + pf * 0.4
-    return 0.18
+    if (pf > 0.15) return (0.4 + pf * 0.4) * dim
+    return 0.18 * dim
   }
 
   function edgeOpacity(e: SimLink): number {
@@ -592,7 +596,8 @@ export default function BrainGraph() {
               {previewNode.memoryStatus && (
                 <span className={
                   previewNode.memoryStatus === 'current' ? 'text-emerald-500'
-                  : previewNode.memoryStatus === 'historical' ? 'text-zinc-600'
+                  : previewNode.memoryStatus === 'historical' || previewNode.memoryStatus === 'paused' ? 'text-zinc-600'
+                  : previewNode.memoryStatus === 'outdated' ? 'text-red-400/70'
                   : 'text-amber-500'
                 }>
                   · {previewNode.memoryStatus.replace(/_/g, ' ')}
@@ -666,8 +671,10 @@ export default function BrainGraph() {
                     <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
                       selectedNode.memoryStatus === 'current'
                         ? 'text-emerald-400 bg-emerald-400/10'
-                        : selectedNode.memoryStatus === 'historical'
+                        : selectedNode.memoryStatus === 'historical' || selectedNode.memoryStatus === 'paused'
                         ? 'text-zinc-500 bg-white/[0.04]'
+                        : selectedNode.memoryStatus === 'outdated'
+                        ? 'text-red-400/80 bg-red-400/10'
                         : 'text-amber-400 bg-amber-400/10'
                     }`}>
                       {selectedNode.memoryStatus.replace(/_/g, ' ')}

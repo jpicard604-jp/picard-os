@@ -93,6 +93,15 @@ export interface XodusChatContext {
   // Honest signals about integrations Picard OS hasn't connected yet.
   // Values are stable string codes — chat route and readiness consume them.
   missingDataSignals?: string[]
+  // Active memory imported from AI chat exports (ChatGPT first). Only
+  // `status: 'current'` records are surfaced as active truth. needs_review,
+  // paused, and outdated records contribute only an "avoid overemphasizing"
+  // summary so XODUS knows what to back off from.
+  importedMemory?: {
+    current:       Array<{ category: string; title: string; content: string }>
+    inactiveCount: number
+    avoidSummary?: string
+  }
 }
 
 // ─── Readiness / wellness signal (transparent, no diagnosis) ──────────────────

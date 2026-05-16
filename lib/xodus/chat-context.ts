@@ -6,6 +6,7 @@ import { getNutritionProfile } from '../nutrition-profile'
 import { getTodayGoals } from '../daily-goals'
 import { getActivityLogs, getThisWeekLogs } from '../fitness'
 import { getRecentNotes } from './notes'
+import { buildImportedMemorySnapshot } from './memory-imports'
 import type { XodusChatContext } from './chat-types'
 
 export function gatherChatContext(): XodusChatContext {
@@ -76,5 +77,6 @@ export function gatherChatContext(): XodusChatContext {
     })),
     weekActivityCount: week.length,
     missingDataSignals,
+    importedMemory: buildImportedMemorySnapshot() ?? undefined,
   }
 }

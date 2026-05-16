@@ -60,3 +60,8 @@ next-env.d.ts
 
 # Vector database (runtime data)
 ruvector.db
+
+# Private memory exports — contains personal chat excerpts; never commit
+/exports/chatgpt-memory-import/
+/exports/claude-memory-import/
+/exports/gemini-memory-import/
